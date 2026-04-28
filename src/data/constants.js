@@ -1,28 +1,31 @@
 // ─────────────────────────────────────────────
 //  USERS & ROLES
 // ─────────────────────────────────────────────
+// ── Known staff (tg_id заполняется в листе "Сотрудники" таблицы) ─────────
 export const USERS = [
-  { id:1, tg:"@anton_leonov",      name:"Антон Леонов",      role:"manager",    dept:"Закупки",      av:"АЛ", color:"#0d9488" },
-  { id:2, tg:"@aigul_aimakhanova", name:"Айгуль Аймаханова", role:"director",   dept:"Закупки",      av:"АА", color:"#7c3aed" },
-  { id:3, tg:"@dinara_k",          name:"Динара К.",          role:"warehouse",  dept:"Склад С341/6", av:"ДК", color:"#0369a1" },
-  { id:4, tg:"@zhanasya_a",        name:"Жансая А.",          role:"director_tk",dept:"ТК Алматы",    av:"ЖА", color:"#b45309" },
-  { id:5, tg:"@bolat_s",           name:"Болат С.",           role:"employee",   dept:"Обжарка",      av:"БС", color:"#166534" },
+  { id:1, tg:"@aigul_aimakhanova", tg_id:null, name:"Айгуль Аймаханова",  role:"admin",       dept:"Отдел закупок",   av:"АА", color:"#7c3aed" },
+  { id:2, tg:"@anton_leonov",      tg_id:null, name:"Антон Леонов",        role:"admin",       dept:"Отдел закупок",   av:"АЛ", color:"#0d9488" },
+  { id:3, tg:"@zhanara_akilbekova",tg_id:null, name:"Жанара Акилбекова",   role:"director_tk", dept:"ТК Астана",       av:"ЖА", color:"#b45309" },
+  { id:4, tg:"@dalida_utegulova",  tg_id:null, name:"Далида Утегулова",    role:"director_tk", dept:"ТК Алматы",       av:"ДУ", color:"#0369a1" },
+  { id:5, tg:"@rustam_tatiev",     tg_id:null, name:"Рустам Татиев",       role:"warehouse",   dept:"Склад ТК Астана", av:"РТ", color:"#166534" },
+  { id:6, tg:"@ertas_umarov",      tg_id:null, name:"Ертас Умаров",        role:"warehouse",   dept:"Склад ТК Алматы", av:"ЕУ", color:"#be185d" },
 ];
 
+// Telegram ID администратора (Антон) — для уведомлений о новых запросах
+export const ADMIN_TG_ID = null; // заполни своим tg_id
+
 export const ROLE_LABELS = {
-  director:    "Директор Закупа",
-  manager:     "Менеджер Закупа",
+  admin:       "Администратор",
   director_tk: "Директор ТК",
   warehouse:   "Завскладом",
-  employee:    "Сотрудник",
+  reader:      "Читатель",
 };
 
 export const ROLE_ACCESS = {
-  director:    ["dashboard","logistics","requests","tasks","coffee","payments","feedback"],
-  manager:     ["dashboard","logistics","requests","tasks","coffee","payments","feedback"],
+  admin:       ["dashboard","logistics","requests","tasks","coffee","payments","feedback"],
   director_tk: ["dashboard","logistics","requests","coffee","feedback"],
-  warehouse:   ["dashboard","logistics","requests","feedback"],
-  employee:    ["dashboard","requests","feedback"],
+  warehouse:   ["dashboard","logistics","requests","coffee","feedback"],
+  reader:      ["dashboard","requests","feedback"],
 };
 
 // ─────────────────────────────────────────────
@@ -90,24 +93,47 @@ export function toKzt(n, cur) {
   return Number(n) * CUR_RATES[cur];
 }
 
+// Текущее время по Астане (UTC+5)
+function nowAstana() {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Almaty' }));
+}
+
+export function nowAstanaStr() {
+  const d = nowAstana();
+  return {
+    date: d.toLocaleDateString('ru-RU'),
+    time: d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+  };
+}
+
+// Используется только для seed-данных (статичные демо-записи)
 export function makeHistory(currentStatus, created) {
-  const idx     = STATUS_FLOW.indexOf(currentStatus);
-  const reached = STATUS_FLOW.slice(0, idx + 1);
-  const base    = new Date("2026-04-01");
-  return [
-    ...reached.map((s, i) => ({
-      status: s,
-      date: new Date(base.getTime() + i * 3 * 24 * 60 * 60 * 1000).toLocaleDateString("ru-RU"),
-      time: `${9 + i}:00`,
-      done: true,
-    })),
-    ...STATUS_FLOW.slice(idx + 1).map(s => ({
-      status: s,
-      date: "—",
-      time: "",
-      done: false,
-    })),
-  ];
+  const idx  = STATUS_FLOW.indexOf(currentStatus);
+  const base = new Date("2026-04-01");
+  return STATUS_FLOW.map((s, i) => {
+    if (i <= idx) {
+      return {
+        status: s,
+        date: new Date(base.getTime() + i * 3 * 24 * 60 * 60 * 1000).toLocaleDateString("ru-RU"),
+        time: `${9 + i}:00`,
+        done: true,
+      };
+    }
+    return { status: s, date: "—", time: "", done: false };
+  });
+}
+
+// Используется при реальном изменении статуса — записывает текущее время Астаны
+export function advanceHistory(existingHistory, newStatus) {
+  const { date, time } = nowAstanaStr();
+  return STATUS_FLOW.map(s => {
+    if (s === newStatus) {
+      return { status: s, date, time, done: true };
+    }
+    const existing = existingHistory?.find(h => h.status === s);
+    if (existing?.done) return existing; // сохраняем прежние временные метки
+    return { status: s, date: "—", time: "", done: false };
+  });
 }
 
 // ─────────────────────────────────────────────

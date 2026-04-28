@@ -32,6 +32,12 @@ function setupSheets() {
       'date','user','role','type','section',
       'priority','title','body','contact'
     ],
+    'Сотрудники': [
+      'id','tg','tg_id','name','role','dept','av','color'
+    ],
+    'Запросы': [
+      'date','tg_id','username','first_name','last_name','status','role'
+    ],
     'Аналитика': [
       '','','','','',  // твой свободный лист — заголовки не трогаем
     ],

@@ -51,3 +51,13 @@ export function parseRow(row, jsonFields = []) {
   }
   return out;
 }
+
+// ── Send access request (unknown user) ────────────────────────────────────
+export async function sendAccessRequest(data) {
+  if (!BASE) return;
+  return fetch(BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'append', sheet: 'Запросы', data }),
+  }).catch(() => {});
+}

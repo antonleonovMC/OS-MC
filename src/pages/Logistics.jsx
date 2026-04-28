@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { WAREHOUSES, STATUS_FLOW, STATUS_DOT, genCode, makeHistory } from '../data/constants';
+import { WAREHOUSES, STATUS_FLOW, STATUS_DOT, genCode, makeHistory, advanceHistory, nowAstanaStr } from '../data/constants';
 import { useData } from '../context/DataContext';
 import Badge from '../components/Badge';
 import StatusTimeline from '../components/StatusTimeline';
@@ -96,11 +96,12 @@ export default function Logistics({ user }) {
   const createOrder = () => {
     if (!canCreate) return;
     const newId = orders.length + 18;
+    const { date: today } = nowAstanaStr();
     const o = {
       ...newOrder, id: newId, code: genCode(newId),
-      payments: [], created: new Date().toLocaleDateString("ru-RU"),
+      payments: [], created: today,
       items: newOrder.items.filter(i => i.name),
-      history: makeHistory("Принят", new Date().toLocaleDateString("ru-RU")),
+      history: advanceHistory([], "Принят"),
     };
     addOrder(o);
     setShowCreate(false);
@@ -116,9 +117,10 @@ export default function Logistics({ user }) {
   };
 
   const changeStatus = (id, s) => {
-    const history = makeHistory(s, orders.find(o=>o.id===id)?.created);
+    const order   = orders.find(o => o.id === id);
+    const history = advanceHistory(order?.history, s);
     updateOrderStatus(id, s, history);
-    setSel(prev => prev ? {...prev, status:s, history} : prev);
+    setSel(prev => prev ? { ...prev, status:s, history } : prev);
     toast.success(`Статус изменён → ${s}`);
   };
 

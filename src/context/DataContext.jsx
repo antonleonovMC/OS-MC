@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
-  INIT_ORDERS, INIT_REQUESTS, INIT_INVOICES, INIT_COFFEE_ORDERS, INIT_TASKS, USERS,
+  INIT_ORDERS, INIT_REQUESTS, INIT_INVOICES, INIT_COFFEE_ORDERS, INIT_TASKS, USERS as DEFAULT_USERS,
   makeHistory, genCode,
 } from '../data/constants';
 import { fetchSheet, appendRow, updateRow, sheetsReady, parseRow } from '../lib/sheetsAPI';
@@ -38,6 +38,7 @@ function mapTask(r) {
 
 export function DataProvider({ children, onReady }) {
   const [loading,  setLoading]  = useState(true);
+  const [staff,    setStaff]    = useState(DEFAULT_USERS);
   const [orders,   setOrders]   = useState([]);
   const [requests, setRequests] = useState([]);
   const [invoices, setInvoices] = useState([]);
@@ -61,18 +62,27 @@ export function DataProvider({ children, onReady }) {
         return;
       }
       try {
-        const [ordersRaw, reqRaw, invRaw, cofRaw, taskRaw] = await Promise.all([
+        const [ordersRaw, reqRaw, invRaw, cofRaw, taskRaw, staffRaw] = await Promise.all([
           fetchSheet('Заказы'),
           fetchSheet('Заявки'),
           fetchSheet('Счета'),
           fetchSheet('Кофе'),
           fetchSheet('Задачи'),
+          fetchSheet('Сотрудники'),
         ]);
         setOrders(ordersRaw.map(mapOrder));
         setRequests(reqRaw.map(mapRequest));
         setInvoices(invRaw.map(mapInvoice));
         setCoffees(cofRaw.map(mapCoffee));
         setTasks(taskRaw.map(mapTask));
+        // Merge sheet staff (with tg_id) over defaults
+        if (staffRaw.length) {
+          setStaff(staffRaw.map(r => ({
+            ...DEFAULT_USERS.find(u => u.tg === r.tg) || {},
+            ...r,
+            tg_id: r.tg_id ? Number(r.tg_id) : null,
+          })));
+        }
       } catch {
         // Fallback to seed on any fetch error
         setOrders(INIT_ORDERS);
@@ -160,7 +170,7 @@ export function DataProvider({ children, onReady }) {
     <Ctx.Provider value={{
       loading,
       // data
-      orders, requests, invoices, coffees, tasks,
+      staff, orders, requests, invoices, coffees, tasks,
       // raw setters (for complex mutations in pages)
       setOrders, setRequests, setInvoices, setCoffees, setTasks,
       // typed mutations (also sync to Sheets)

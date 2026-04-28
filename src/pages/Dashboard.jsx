@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { TrendingUp, TrendingDown, Package, ClipboardList, Coffee, Truck } from 'lucide-react';
-import { SALES, INIT_ORDERS, INIT_REQUESTS, INIT_COFFEE_ORDERS, PRODUCT_GROUPS, DASHBOARD_CITIES } from '../data/constants';
+import { SALES, PRODUCT_GROUPS, DASHBOARD_CITIES } from '../data/constants';
+import { useData } from '../context/DataContext';
 
 const BRAND    = '#28798d';
 const BRAND_LT = '#e8f4f6';
@@ -86,9 +87,10 @@ export default function Dashboard({ setPage }) {
   const stock    = rows.reduce((a,s)=>a+s.stock, 0);
   const delta    = soldPrev>0 ? Math.round((sold-soldPrev)/soldPrev*100) : 0;
 
-  const active = INIT_ORDERS.filter(o=>!["Архив","Доставлен"].includes(o.status));
-  const pReqs  = INIT_REQUESTS.filter(r=>r.status==="Ожидает");
-  const pCoff  = INIT_COFFEE_ORDERS.filter(o=>o.status!=="Получен");
+  const { orders, requests, coffees } = useData();
+  const active = orders.filter(o=>!["Архив","Доставлен"].includes(o.status));
+  const pReqs  = requests.filter(r=>r.status==="Ожидает");
+  const pCoff  = coffees.filter(o=>o.status!=="Получен");
 
   const barData = useMemo(()=>{
     const m={};

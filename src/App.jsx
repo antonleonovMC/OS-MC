@@ -44,9 +44,10 @@ function DataLoader() {
       <div style={{ position:'relative', width:100, height:100, display:'flex',
         alignItems:'center', justifyContent:'center', marginBottom:20 }}>
         <svg width="100" height="100" style={{ position:'absolute', inset:0 }}>
-          <circle cx="50" cy="50" r="46" fill="none" stroke="#e8f4f6" strokeWidth="3"/>
-          <motion.circle cx="50" cy="50" r="46" fill="none" stroke={BRAND} strokeWidth="3"
-            strokeLinecap="round" strokeDasharray="72 216"
+          <circle cx="50" cy="50" r="44" fill="none" stroke="#e8f4f6" strokeWidth="3"/>
+          <motion.circle cx="50" cy="50" r="44" fill="none" stroke={BRAND} strokeWidth="3"
+            strokeLinecap="round"
+            strokeDasharray={`${2*Math.PI*44*0.25} ${2*Math.PI*44*0.75}`}
             style={{ originX:'50px', originY:'50px', rotate:-90 }}
             animate={{ rotate:['-90deg','270deg'] }}
             transition={{ duration:1.1, repeat:Infinity, ease:'linear' }}/>
