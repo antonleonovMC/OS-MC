@@ -62,13 +62,12 @@ export async function sendAccessRequest(data) {
   }).catch(() => {});
 }
 
-// ── Send Telegram notification via Bot API ─────────────────────────────────
+// ── Send Telegram notification (proxied via Vercel to avoid CORS) ──────────
 export async function notifyTelegram(chatId, text, replyMarkup) {
-  const token = import.meta.env.VITE_TG_BOT_TOKEN;
-  if (!token || !chatId) return;
+  if (!chatId) return;
   const body = { chat_id: chatId, text };
   if (replyMarkup) body.reply_markup = replyMarkup;
-  return fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+  return fetch('/api/notify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

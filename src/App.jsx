@@ -59,7 +59,10 @@ function DataLoader() {
             strokeDashoffset={circ * 0.25}/>
         </motion.svg>
         {/* Logo */}
-        <img src={LOGO} style={{ width:56, height:56, objectFit:'contain', borderRadius:16, position:'relative', zIndex:1 }}/>
+        <motion.img src={LOGO}
+          style={{ width:56, height:56, objectFit:'contain', borderRadius:16, position:'relative', zIndex:1 }}
+          animate={{ y:[0,-6,0] }}
+          transition={{ duration:1.8, repeat:Infinity, ease:'easeInOut' }}/>
       </div>
       <div style={{ fontSize:15, fontWeight:700, color:'#1a3a42', marginBottom:4 }}>Загружаем данные…</div>
       <div style={{ fontSize:12, color:'#94a3b8' }}>Синхронизация с Google Sheets</div>

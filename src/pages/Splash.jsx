@@ -4,7 +4,7 @@ import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 const BRAND  = '#28798d';
 const DARK   = '#1a3a42';
 const LOGO   = '/logo.png';
-const HERO   = 'https://i.ibb.co/whDnJ1FC/image.png';
+const HERO   = '/hero.jpg'; // положи фото в /public/hero.jpg
 
 const TRACK_W  = 280;
 const THUMB_W  = 56;
