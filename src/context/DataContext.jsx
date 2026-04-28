@@ -75,13 +75,18 @@ export function DataProvider({ children, onReady }) {
         setInvoices(invRaw.map(mapInvoice));
         setCoffees(cofRaw.map(mapCoffee));
         setTasks(taskRaw.map(mapTask));
-        // Merge sheet staff (with tg_id) over defaults
+        // Merge sheet staff over defaults — sheet tg_id wins, else keep hardcoded
         if (staffRaw.length) {
-          setStaff(staffRaw.map(r => ({
-            ...DEFAULT_USERS.find(u => u.tg === r.tg) || {},
-            ...r,
-            tg_id: r.tg_id ? Number(r.tg_id) : null,
-          })));
+          setStaff(staffRaw.map(r => {
+            const def = DEFAULT_USERS.find(u =>
+              u.tg?.replace('@','').toLowerCase() === (r.tg || '').replace('@','').toLowerCase()
+            ) || {};
+            return {
+              ...def,
+              ...r,
+              tg_id: r.tg_id ? Number(r.tg_id) : (def.tg_id || null),
+            };
+          }));
         }
       } catch {
         // Fallback to seed on any fetch error

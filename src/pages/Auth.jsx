@@ -82,10 +82,15 @@ export default function Auth({ onLogin }) {
     setTgUser(tgU);
     const id = Number(tgU.id);
     const un = (tgU.username || '').toLowerCase();
-    const found = users.find(u =>
+
+    const match = (list) => list.find(u =>
       (u.tg_id && Number(u.tg_id) === id) ||
       (un && u.tg?.replace('@', '').toLowerCase() === un)
     );
+
+    // Check staff from Sheets first, then fall back to hardcoded DEFAULT_USERS
+    const found = match(users) || match(DEFAULT_USERS);
+
     if (found) {
       localStorage.setItem('mc_tg_id', id);
       setPhase('logging_in');
