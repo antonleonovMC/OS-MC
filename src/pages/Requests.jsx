@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { INIT_REQUESTS } from '../data/constants';
+import { useData } from '../context/DataContext';
 import Badge from '../components/Badge';
 
 const BRAND = '#28798d';
@@ -11,7 +11,7 @@ const EMPTY_FORM = { fullName:"", email:"", dept:"", budgetDept:"", legalEntity:
 const URGENCY_COLOR = { "Критично":"bg-red-100 text-red-700", "Срочно":"bg-amber-100 text-amber-700", "Обычная":"bg-green-100 text-green-700" };
 
 export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) {
-  const [reqs, setReqs]         = useState(INIT_REQUESTS);
+  const { requests: reqs, addRequest, updateRequestStatus } = useData();
   const [showForm, setShowForm] = useState(false);
   const [sel, setSel]           = useState(null);
   const [step, setStep]         = useState(1);
@@ -24,12 +24,13 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
   const filtered  = visible.filter(r => statusF === "Все" || r.status === statusF);
 
   const submit = () => {
-    setReqs(prev => [{ id:`REQ-0${prev.length+24}`, employee:user.name.split(" ").slice(0,2).join(" "), dept:user.dept, category:form.category||"Другое", product:form.product, qty:form.qty, urgency:form.urgency, date:new Date().toLocaleDateString("ru-RU"), status:"Ожидает", comment:form.comment }, ...prev]);
+    const req = { id:`REQ-0${reqs.length+24}`, employee:user.name.split(" ").slice(0,2).join(" "), dept:user.dept, category:form.category||"Другое", product:form.product, qty:form.qty, urgency:form.urgency, date:new Date().toLocaleDateString("ru-RU"), status:"Ожидает", comment:form.comment };
+    addRequest(req);
     setShowForm(false); setStep(1); setForm(EMPTY_FORM);
     toast.success("Заявка отправлена на рассмотрение");
   };
-  const approve = id => { setReqs(p=>p.map(r=>r.id===id?{...r,status:"Одобрена"}:r)); setSel(p=>p?{...p,status:"Одобрена"}:p); toast.success("Заявка одобрена"); };
-  const reject  = id => { setReqs(p=>p.map(r=>r.id===id?{...r,status:"Отклонена"}:r)); setSel(p=>p?{...p,status:"Отклонена"}:p); toast.error("Заявка отклонена"); };
+  const approve = id => { updateRequestStatus(id, "Одобрена");  setSel(p=>p?{...p,status:"Одобрена"}:p);  toast.success("Заявка одобрена"); };
+  const reject  = id => { updateRequestStatus(id, "Отклонена"); setSel(p=>p?{...p,status:"Отклонена"}:p); toast.error("Заявка отклонена"); };
 
   const I = (key,ph,type="text") => <input type={type} placeholder={ph} value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})} className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2" style={{'--tw-ring-color':BRAND}}/>;
   const S = (key,opts) => <select value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})} className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2" style={{'--tw-ring-color':BRAND}}><option value="">Выберите…</option>{opts.map(o=><option key={o}>{o}</option>)}</select>;

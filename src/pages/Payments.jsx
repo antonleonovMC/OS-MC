@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { INIT_INVOICES, CURRENCIES, CUR_SIGN, CUR_RATES } from '../data/constants';
+import { CURRENCIES, CUR_SIGN, CUR_RATES } from '../data/constants';
+import { useData } from '../context/DataContext';
 import Badge from '../components/Badge';
 
 const BRAND   = '#28798d';
@@ -30,9 +31,7 @@ function ProgressArc({ pct }) {
 }
 
 export default function Payments() {
-  const [invoices, setInvoices] = useState(() =>
-    INIT_INVOICES.map(inv => ({ ...inv, payments: [], dueDate: '', comment: '' }))
-  );
+  const { invoices, addInvoice, updateInvoice } = useData();
   const [payModal,  setPayModal]  = useState(null);
   const [showForm,  setShowForm]  = useState(false);
   const [selInv,    setSelInv]    = useState(null);
@@ -63,14 +62,14 @@ export default function Payments() {
       date:    payForm.date || new Date().toISOString(),
       comment: payForm.comment,
     };
-    setInvoices(prev => prev.map(inv => {
-      if (inv.id !== payModal.id) return inv;
-      const newPaid = Math.min(inv.paid + amtOrig, inv.amount);
-      const status  = newPaid >= inv.amount ? 'Оплачен' : newPaid > 0 ? 'Частично' : 'Не оплачен';
-      const updated = { ...inv, paid: newPaid, status, payments: [...inv.payments, payEntry] };
-      if (selInv?.id === inv.id) setSelInv(updated);
-      return updated;
-    }));
+    const inv = invoices.find(i => i.id === payModal.id);
+    if (inv) {
+      const newPaid    = Math.min(inv.paid + amtOrig, inv.amount);
+      const status     = newPaid >= inv.amount ? 'Оплачен' : newPaid > 0 ? 'Частично' : 'Не оплачен';
+      const newPayments = [...inv.payments, payEntry];
+      updateInvoice(payModal.id, { paid: newPaid, status, payments: newPayments });
+      if (selInv?.id === inv.id) setSelInv(p => p ? { ...p, paid: newPaid, status, payments: newPayments } : p);
+    }
     toast.success('Оплата зафиксирована');
     setPayModal(null);
     setPayForm(EMPTY_PAY);
@@ -78,13 +77,11 @@ export default function Payments() {
 
   const createInvoice = () => {
     if (!newInv.supplier || !newInv.amount) return;
-    const id = `INV-${String(invoices.length + 24).padStart(2,'0')}`;
-    setInvoices(prev => [
-      { id, supplier: newInv.supplier, desc: newInv.desc, amount: Number(newInv.amount),
-        paid: 0, cur: newInv.cur, status: 'Не оплачен',
-        dueDate: newInv.dueDate, comment: newInv.comment, payments: [] },
-      ...prev,
-    ]);
+    const id  = `INV-${String(invoices.length + 24).padStart(2,'0')}`;
+    const inv = { id, supplier: newInv.supplier, desc: newInv.desc, amount: Number(newInv.amount),
+      paid: 0, cur: newInv.cur, status: 'Не оплачен',
+      dueDate: newInv.dueDate, comment: newInv.comment, payments: [] };
+    addInvoice(inv);
     setShowForm(false);
     setNewInv(EMPTY_INV);
     toast.success(`Счёт ${id} создан`);

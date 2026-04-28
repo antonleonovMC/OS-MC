@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { INIT_ORDERS, WAREHOUSES, STATUS_FLOW, STATUS_DOT, genCode, makeHistory } from '../data/constants';
+import { WAREHOUSES, STATUS_FLOW, STATUS_DOT, genCode, makeHistory } from '../data/constants';
+import { useData } from '../context/DataContext';
 import Badge from '../components/Badge';
 import StatusTimeline from '../components/StatusTimeline';
 
@@ -53,7 +54,8 @@ const itemVariants = {
 };
 
 export default function Logistics({ user }) {
-  const [orders, setOrders]               = useState(INIT_ORDERS);
+  const { orders, addOrder, updateOrderStatus } = useData();
+  const setOrders = () => {}; // unused — mutations go via context
   const [sel, setSel]                     = useState(null);
   const [search, setSearch]               = useState("");
   const [whFilter, setWhFilter]           = useState("Все склады");
@@ -100,7 +102,7 @@ export default function Logistics({ user }) {
       items: newOrder.items.filter(i => i.name),
       history: makeHistory("Принят", new Date().toLocaleDateString("ru-RU")),
     };
-    setOrders(prev => [o, ...prev]);
+    addOrder(o);
     setShowCreate(false);
     setNewOrder({ title:"", supplier:"", warehouse:"Астана", planDate:"", status:"Принят", comment:"", country:"РК", items:[{name:"",qty:"",unit:"шт"}] });
     toast.success(`Заказ ${o.code} создан`);
@@ -114,8 +116,9 @@ export default function Logistics({ user }) {
   };
 
   const changeStatus = (id, s) => {
-    setOrders(prev => prev.map(o => o.id===id ? {...o, status:s, history:makeHistory(s, o.created)} : o));
-    setSel(prev => prev ? {...prev, status:s, history:makeHistory(s, prev.created)} : prev);
+    const history = makeHistory(s, orders.find(o=>o.id===id)?.created);
+    updateOrderStatus(id, s, history);
+    setSel(prev => prev ? {...prev, status:s, history} : prev);
     toast.success(`Статус изменён → ${s}`);
   };
 
