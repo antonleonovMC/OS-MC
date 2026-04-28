@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ROLE_LABELS, ROLE_ACCESS, USERS as DEFAULT_USERS } from '../data/constants';
+import { ROLE_LABELS, ROLE_ACCESS, USERS as DEFAULT_USERS, ADMIN_TG_ID } from '../data/constants';
 import { useData } from '../context/DataContext';
-import { sendAccessRequest } from '../lib/sheetsAPI';
+import { sendAccessRequest, notifyTelegram } from '../lib/sheetsAPI';
 
 const BRAND = '#28798d';
 const DARK  = '#1a3a42';
@@ -114,7 +114,7 @@ export default function Auth({ onLogin }) {
       (un && u.tg?.replace('@','').toLowerCase() === un)
     );
     if (found) {
-      setMatched({ ...found, tg_id: id });
+      setMatched({ ...found, tg_id: id, photo_url: tgU.photo_url || null });
       setPhase('confirm');
     } else {
       setPhase('pending');
@@ -125,15 +125,21 @@ export default function Auth({ onLogin }) {
   async function submitRequest() {
     if (!tgUser) return;
     setPhase('loading');
+    const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ') || '—';
+    const username = tgUser.username ? '@' + tgUser.username : '—';
     await sendAccessRequest({
       date:       new Date().toLocaleString('ru-RU'),
       tg_id:      tgUser.id,
-      username:   tgUser.username ? '@'+tgUser.username : '—',
+      username,
       first_name: tgUser.first_name || '',
       last_name:  tgUser.last_name  || '',
       status:     'Ожидает',
       role:       '',
     });
+    await notifyTelegram(
+      ADMIN_TG_ID,
+      `🔐 <b>Новый запрос на доступ</b>\n\n👤 <b>${fullName}</b>\nTelegram: ${username}\nID: <code>${tgUser.id}</code>\n\nОткройте таблицу «Запросы» и добавьте пользователя в лист «Сотрудники» с нужной ролью.`,
+    );
     setPhase('requested');
   }
 

@@ -1,4 +1,5 @@
 import { ROLE_ACCESS, ROLE_LABELS } from '../data/constants';
+import Avatar from './Avatar';
 
 export default function Sidebar({ user, page, setPage, onLogout }) {
   const access = ROLE_ACCESS[user.role];
@@ -37,12 +38,7 @@ export default function Sidebar({ user, page, setPage, onLogout }) {
       {/* User */}
       <div className="p-3 border-b border-slate-800">
         <div className="flex items-center gap-2 px-2 py-1.5">
-          <div
-            className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center text-white text-xs font-bold"
-            style={{ background: user.color }}
-          >
-            {user.av}
-          </div>
+          <Avatar user={user} size={32} radius={8} />
           <div className="min-w-0">
             <div className="text-white text-xs font-medium truncate">{user.name}</div>
             <div className="text-teal-400 text-[9px] uppercase tracking-wide">{ROLE_LABELS[user.role]}</div>

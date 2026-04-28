@@ -4,15 +4,15 @@
 // ── Known staff (tg_id заполняется в листе "Сотрудники" таблицы) ─────────
 export const USERS = [
   { id:1, tg:"@aigul_aimakhanova", tg_id:null, name:"Айгуль Аймаханова",  role:"admin",       dept:"Отдел закупок",   av:"АА", color:"#7c3aed" },
-  { id:2, tg:"@anton_leonov",      tg_id:null, name:"Антон Леонов",        role:"admin",       dept:"Отдел закупок",   av:"АЛ", color:"#0d9488" },
+  { id:2, tg:"@aanton_l",          tg_id:1433619908, name:"Антон Леонов",        role:"admin",       dept:"Отдел закупок",   av:"АЛ", color:"#0d9488" },
   { id:3, tg:"@zhanara_akilbekova",tg_id:null, name:"Жанара Акилбекова",   role:"director_tk", dept:"ТК Астана",       av:"ЖА", color:"#b45309" },
   { id:4, tg:"@dalida_utegulova",  tg_id:null, name:"Далида Утегулова",    role:"director_tk", dept:"ТК Алматы",       av:"ДУ", color:"#0369a1" },
   { id:5, tg:"@rustam_tatiev",     tg_id:null, name:"Рустам Татиев",       role:"warehouse",   dept:"Склад ТК Астана", av:"РТ", color:"#166534" },
   { id:6, tg:"@ertas_umarov",      tg_id:null, name:"Ертас Умаров",        role:"warehouse",   dept:"Склад ТК Алматы", av:"ЕУ", color:"#be185d" },
 ];
 
-// Telegram ID администратора (Антон) — для уведомлений о новых запросах
-export const ADMIN_TG_ID = null; // заполни своим tg_id
+// Telegram ID администратора (Антон Леонов) — для уведомлений о новых запросах
+export const ADMIN_TG_ID = Number(import.meta.env.VITE_ADMIN_TG_ID) || 1433619908;
 
 export const ROLE_LABELS = {
   admin:       "Администратор",

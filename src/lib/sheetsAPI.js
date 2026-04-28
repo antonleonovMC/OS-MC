@@ -61,3 +61,14 @@ export async function sendAccessRequest(data) {
     body: JSON.stringify({ action: 'append', sheet: 'Запросы', data }),
   }).catch(() => {});
 }
+
+// ── Send Telegram notification via Bot API ─────────────────────────────────
+export async function notifyTelegram(chatId, text) {
+  const token = import.meta.env.VITE_TG_BOT_TOKEN;
+  if (!token || !chatId) return;
+  return fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
+  }).catch(() => {});
+}

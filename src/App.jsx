@@ -15,6 +15,7 @@ import Tasks      from './pages/Tasks';
 import Feedback   from './pages/Feedback';
 import Sidebar    from './components/Sidebar';
 import BottomNav  from './components/BottomNav';
+import Avatar     from './components/Avatar';
 
 const BRAND = '#28798d';
 const LOGO  = '/logo.png';
@@ -65,7 +66,6 @@ function Inner() {
   const [user, setUser]               = useState(null);
   const [page, setPage]               = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [logoErr, setLogoErr]         = useState(false);
 
   if (!user) return <Auth onLogin={u => { setUser(u); setPage('dashboard'); }} />;
 
@@ -124,12 +124,9 @@ function Inner() {
               <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full border border-white" style={{ background:'#ef4444' }}/>
             </button>
             <button onClick={() => safePage('dashboard')}
-              className="w-7 h-7 rounded-xl overflow-hidden flex items-center justify-center hover:ring-2 transition-all"
+              className="hover:ring-2 transition-all rounded-xl overflow-hidden"
               style={{ '--tw-ring-color':BRAND }}>
-              {!logoErr
-                ? <img src={LOGO} alt="MC" className="w-full h-full object-contain" onError={() => setLogoErr(true)}/>
-                : <div className="w-full h-full flex items-center justify-center text-white text-[9px] font-black" style={{ background:BRAND }}>MC</div>
-              }
+              <Avatar user={user} size={28} radius={8} />
             </button>
           </div>
         </header>
