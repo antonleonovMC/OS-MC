@@ -38,6 +38,15 @@ function setupSheets() {
     'Запросы': [
       'date','tg_id','username','first_name','last_name','status','role'
     ],
+    'Подписки': [
+      'id','tg_id','order_id','order_title'
+    ],
+    'Данные дашборда': [
+      'city','product_group','date_start','date_end','product_name','stock','sales_total','sales_per_day'
+    ],
+    'Настройки': [
+      'key','value'
+    ],
     'Аналитика': [
       '','','','','',  // твой свободный лист — заголовки не трогаем
     ],
@@ -85,6 +94,16 @@ function setupSheets() {
   if (defaultSheet && defaultSheet.getLastRow() === 0) {
     SS.deleteSheet(defaultSheet);
     Logger.log('Удалён пустой лист по умолчанию');
+  }
+
+  // Seed Настройки with city and product group lists if empty
+  const settingsSheet = SS.getSheetByName('Настройки');
+  if (settingsSheet && settingsSheet.getLastRow() <= 1) {
+    const seeds = [
+      ['cities',         'Астана,Алматы,Шымкент,Актобе,Атырау'],
+      ['product_groups', 'Кофе,Чай,Сиропы,Оборудование,Расходники'],
+    ];
+    seeds.forEach(row => settingsSheet.appendRow(row));
   }
 
   SpreadsheetApp.getUi().alert('✅ Готово! Все листы Master Coffee OS созданы.');

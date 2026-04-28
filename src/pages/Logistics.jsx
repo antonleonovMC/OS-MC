@@ -148,6 +148,8 @@ export default function Logistics({ user }) {
   };
 
   const saveEdit = () => {
+    const statusChanged = editData.status !== sel.status;
+    const history = statusChanged ? advanceHistory(sel.history, editData.status) : sel.history;
     const patch = {
       title:     editData.title,
       supplier:  editData.supplier,
@@ -156,12 +158,17 @@ export default function Logistics({ user }) {
       warehouse: editData.warehouse,
       comment:   editData.comment,
       items:     editData.items.filter(i => i.name),
+      status:    editData.status,
+      history,
     };
     updateOrder(sel.id, patch);
     const updated = { ...sel, ...patch };
     setSel(updated);
     setEditMode(false);
-    notifySubscribers(sel, `Данные заказа обновлены администратором`);
+    const changeText = statusChanged
+      ? `Данные заказа обновлены. Новый статус: ${editData.status}`
+      : `Данные заказа обновлены администратором`;
+    notifySubscribers(sel, changeText);
     toast.success('Заказ обновлён');
   };
 
@@ -195,6 +202,17 @@ export default function Logistics({ user }) {
                 style={{ '--tw-ring-color': BRAND }} />
             </div>
           ))}
+          <div>
+            <div className="text-xs text-gray-500 mb-1">Статус</div>
+            <div className="flex flex-wrap gap-1.5">
+              {visibleStatuses(editData).map(s => (
+                <button key={s} type="button" onClick={() => setEditData(p => ({ ...p, status: s }))}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${editData.status===s?"bg-teal-600 text-white":"bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <div className="text-xs text-gray-500 mb-1">Страна</div>
@@ -337,21 +355,6 @@ export default function Logistics({ user }) {
           <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">История статусов</div>
           <StatusTimeline history={sel.history} />
         </div>
-
-        {/* Change status */}
-        {isAdmin && (
-          <div className="px-5 py-4 border-b border-gray-100">
-            <div className="text-xs text-gray-400 mb-2 uppercase tracking-wider font-semibold">Изменить статус</div>
-            <div className="flex flex-wrap gap-1.5">
-              {visibleStatuses(sel).map(s => (
-                <button key={s} onClick={() => changeStatus(sel.id, s)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${sel.status===s?"bg-teal-600 text-white":"bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         <div className="px-5 py-4">
           <button onClick={() => setSel(null)} className="w-full py-3 bg-slate-800 text-white rounded-xl text-sm font-semibold hover:bg-slate-700 transition-colors">

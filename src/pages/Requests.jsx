@@ -6,7 +6,7 @@ import Badge from '../components/Badge';
 
 const BRAND = '#28798d';
 const STEP_LABELS = ["Контакты","Структура","Товар","Логистика","Поставщик","Итого"];
-const EMPTY_FORM = { fullName:"", email:"", dept:"", budgetDept:"", legalEntity:"", product:"", qty:"", basis:"", url:"", deliveryDate:"", address:"", contact:"", supplierCompany:"", supplierPerson:"", supplierPhone:"", comment:"", urgency:"Обычная", category:"" };
+const EMPTY_FORM = { fullName:"", email:"", dept:"", budgetDept:"", legalEntity:"", product:"", qty:"", basis:"", url:"", deliveryDate:"", address:"", contact:"", supplierCompany:"", supplierPerson:"", supplierPhone:"", comment:"", urgency:"Обычная", category:"", fileName:"" };
 
 const URGENCY_COLOR = { "Критично":"bg-red-100 text-red-700", "Срочно":"bg-amber-100 text-amber-700", "Обычная":"bg-green-100 text-green-700" };
 
@@ -32,8 +32,9 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
   const approve = id => { updateRequestStatus(id, "Одобрена");  setSel(p=>p?{...p,status:"Одобрена"}:p);  toast.success("Заявка одобрена"); };
   const reject  = id => { updateRequestStatus(id, "Отклонена"); setSel(p=>p?{...p,status:"Отклонена"}:p); toast.error("Заявка отклонена"); };
 
-  const I = (key,ph,type="text") => <input type={type} placeholder={ph} value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})} className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2" style={{'--tw-ring-color':BRAND}}/>;
-  const S = (key,opts) => <select value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})} className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2" style={{'--tw-ring-color':BRAND}}><option value="">Выберите…</option>{opts.map(o=><option key={o}>{o}</option>)}</select>;
+  const set = (key, val) => setForm(p => ({...p, [key]: val}));
+  const I = (key,ph,type="text") => <input type={type} placeholder={ph} value={form[key]} onChange={e=>set(key,e.target.value)} className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2" style={{'--tw-ring-color':BRAND}}/>;
+  const S = (key,opts) => <select value={form[key]} onChange={e=>set(key,e.target.value)} className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2" style={{'--tw-ring-color':BRAND}}><option value="">Выберите…</option>{opts.map(o=><option key={o}>{o}</option>)}</select>;
   const F = ({label,children}) => <div><label className="text-xs font-semibold text-gray-500 block mb-1.5 uppercase tracking-wide">{label}</label>{children}</div>;
 
   // ── Detail view ──────────────────────────────────────────────────────────────
@@ -171,7 +172,25 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
             <div className="p-5 space-y-4">
               {step===1&&<><F label="ФИО">{I("fullName","Фамилия Имя Отчество")}</F><F label="Email">{I("email","email@mastercoffee.kz","email")}</F></>}
               {step===2&&<><F label="Подразделение">{S("dept",["УК","ТК","Обжарка","Цех","Кофейни"])}</F><F label="Бюджетное подразделение">{I("budgetDept","Название")}</F><F label="Юр. лицо">{S("legalEntity",["ТОО Мастер Кофе","ИП Master Coffee Trade","ИП Master Coffee Roasters","ТОО Mastercoffee.kz","Другое"])}</F></>}
-              {step===3&&<><F label="Наименование товара">{I("product","Что нужно закупить?")}</F><F label="Количество">{I("qty","100 шт")}</F><F label="Категория">{S("category",["Обжарка","Упаковка","Сиропы","Оргтехника","Хозтовары","Химия","Другое"])}</F><F label="Срочность">{S("urgency",["Обычная","Срочно","Критично"])}</F><F label="Основание">{I("basis","Обоснование")}</F></>}
+              {step===3&&<>
+                <F label="Наименование товара">{I("product","Что нужно закупить?")}</F>
+                <F label="Количество">{I("qty","100 шт")}</F>
+                <F label="Категория">{S("category",["Обжарка","Упаковка","Сиропы","Оргтехника","Хозтовары","Химия","Другое"])}</F>
+                <F label="Срочность">{S("urgency",["Обычная","Срочно","Критично"])}</F>
+                <F label="Основание">{I("basis","Обоснование")}</F>
+                <F label="Прикрепить файл (ТЗ, прайс, фото)">
+                  <div style={{ border:'1.5px dashed #cbd5e1', borderRadius:12, padding:'12px 14px', background:'#f8fafc', display:'flex', alignItems:'center', gap:10 }}>
+                    <input type="file" id="req-file" style={{ display:'none' }}
+                      onChange={e => set('fileName', e.target.files?.[0]?.name || '')} />
+                    <label htmlFor="req-file" style={{ cursor:'pointer', fontSize:12, fontWeight:600, color:BRAND, padding:'6px 14px', borderRadius:8, background:'#e8f4f6' }}>
+                      Выбрать файл
+                    </label>
+                    <span style={{ fontSize:12, color: form.fileName ? '#1a3a42' : '#94a3b8', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {form.fileName || 'Файл не выбран'}
+                    </span>
+                  </div>
+                </F>
+              </>}
               {step===4&&<><F label="Срок поставки">{I("deliveryDate","","date")}</F><F label="Адрес доставки">{I("address","г. Астана, ул. …")}</F><F label="Контакты получателя">{I("contact","+7 701 …")}</F></>}
               {step===5&&<><F label="Компания поставщика">{I("supplierCompany","Название")}</F><F label="Контактное лицо">{I("supplierPerson","Имя")}</F><F label="Телефон">{I("supplierPhone","+7 …")}</F></>}
               {step===6&&<div className="space-y-3"><div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">{[["Товар",form.product],["Кол-во",form.qty],["Срочность",form.urgency],["Подразделение",form.dept],["Юр. лицо",form.legalEntity],["Поставщик",form.supplierCompany]].filter(([,v])=>v).map(([l,v])=><div key={l} className="flex justify-between"><span className="text-gray-500">{l}</span><span className="font-medium text-gray-800">{v}</span></div>)}</div><F label="Комментарий"><textarea value={form.comment} onChange={e=>setForm({...form,comment:e.target.value})} rows={3} className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none resize-none" placeholder="Дополнительные детали…"/></F></div>}

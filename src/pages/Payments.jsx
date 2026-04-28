@@ -95,6 +95,79 @@ export default function Payments() {
   );
   const inp = 'w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 bg-white';
 
+  // ── Pay modal — rendered globally so it works from detail view too ──────────
+  const PayModal = payModal && (
+    <AnimatePresence>
+      <motion.div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+        initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+        style={{background:'rgba(0,0,0,0.5)'}} onClick={()=>setPayModal(null)}>
+        <motion.div initial={{y:32,opacity:0}} animate={{y:0,opacity:1}} exit={{y:20,opacity:0}}
+          transition={{duration:0.22,ease:'easeOut'}}
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+          onClick={e=>e.stopPropagation()}>
+          <div style={{ padding:'18px 20px 14px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <span style={{ fontSize:15, fontWeight:700, color:'#1a3a42' }}>Внести оплату</span>
+            <button onClick={()=>setPayModal(null)} style={{ color:'#94a3b8', fontSize:18, background:'none', border:'none', cursor:'pointer' }}>✕</button>
+          </div>
+          <div style={{ margin:'14px 20px', background:'linear-gradient(135deg,#1a3a42,#28798d)', borderRadius:14, padding:'14px 16px', color:'white' }}>
+            <div style={{ fontSize:13, fontWeight:700 }}>{payModal.supplier}</div>
+            <div style={{ fontSize:11, opacity:0.65, marginBottom:8 }}>{payModal.id}{payModal.desc ? ' · ' + payModal.desc : ''}</div>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}>
+              <span style={{ opacity:0.7 }}>Остаток</span>
+              <span style={{ fontWeight:700 }}>{fmt(payModal.amount - payModal.paid, payModal.cur)}</span>
+            </div>
+          </div>
+          <div style={{ padding:'0 20px', display:'flex', flexDirection:'column', gap:12 }}>
+            <F label="Валюта платежа">
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {CURRENCIES.map(c=>(
+                  <button key={c} onClick={()=>setPayForm(p=>({...p,cur:c}))}
+                    style={{ padding:'5px 12px', borderRadius:20, fontSize:12, fontWeight:600, border:'none', cursor:'pointer',
+                      background: payForm.cur===c ? BRAND : '#f0f9fa', color: payForm.cur===c ? 'white' : BRAND, transition:'all .15s' }}>
+                    {CUR_SIGN[c]} {c}
+                  </button>
+                ))}
+              </div>
+            </F>
+            <F label={`Сумма (${payForm.cur})`}>
+              <input type="number" value={payForm.amount} onChange={e=>setPayForm(p=>({...p,amount:e.target.value}))}
+                placeholder="0" className={inp} style={{'--tw-ring-color':BRAND}}/>
+              {payForm.amount && payForm.cur !== 'KZT' && (
+                <div style={{ fontSize:11, color:'#94a3b8', marginTop:4 }}>
+                  ≈ {(Number(payForm.amount)*(Number(payForm.rate)||CUR_RATES[payForm.cur])).toLocaleString('ru-RU')} ₸
+                </div>
+              )}
+            </F>
+            {payForm.cur !== 'KZT' && (
+              <F label="Курс к ₸">
+                <input type="number" value={payForm.rate} onChange={e=>setPayForm(p=>({...p,rate:e.target.value}))}
+                  placeholder={String(CUR_RATES[payForm.cur])} className={inp} style={{'--tw-ring-color':BRAND}}/>
+              </F>
+            )}
+            <F label="Дата и время оплаты">
+              <input type="datetime-local" value={payForm.date} onChange={e=>setPayForm(p=>({...p,date:e.target.value}))}
+                className={inp} style={{'--tw-ring-color':BRAND}}/>
+            </F>
+            <F label="Комментарий">
+              <input value={payForm.comment} onChange={e=>setPayForm(p=>({...p,comment:e.target.value}))}
+                placeholder="Назначение платежа…" className={inp} style={{'--tw-ring-color':BRAND}}/>
+            </F>
+          </div>
+          <div style={{ padding:'14px 20px 18px', display:'flex', gap:10, marginTop:6 }}>
+            <button onClick={()=>setPayModal(null)}
+              style={{ flex:1, padding:'11px', borderRadius:12, background:'#f1f5f9', color:'#64748b', fontSize:13, fontWeight:500, border:'none', cursor:'pointer' }}>
+              Отмена
+            </button>
+            <button onClick={submitPayment}
+              style={{ flex:1, padding:'11px', borderRadius:12, background:'#059669', color:'white', fontSize:13, fontWeight:600, border:'none', cursor:'pointer', opacity:!payForm.amount?0.5:1 }}>
+              Подтвердить
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+
   // ── Detail view ──────────────────────────────────────────────────────────────
   if (selInv) {
     const inv  = invoices.find(i => i.id === selInv.id) || selInv;
@@ -184,6 +257,7 @@ export default function Payments() {
             </div>
           )}
         </div>
+        {PayModal}
       </div>
     );
   }
@@ -373,83 +447,7 @@ export default function Payments() {
         )}
       </AnimatePresence>
 
-      {/* ── Pay modal ──────────────────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {payModal && (
-          <motion.div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
-            initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-            style={{background:'rgba(0,0,0,0.5)'}} onClick={()=>setPayModal(null)}>
-            <motion.div initial={{y:32,opacity:0}} animate={{y:0,opacity:1}} exit={{y:20,opacity:0}}
-              transition={{duration:0.22,ease:'easeOut'}}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
-              onClick={e=>e.stopPropagation()}>
-              <div style={{ padding:'18px 20px 14px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                <span style={{ fontSize:15, fontWeight:700, color:'#1a3a42' }}>Внести оплату</span>
-                <button onClick={()=>setPayModal(null)} style={{ color:'#94a3b8', fontSize:18, background:'none', border:'none', cursor:'pointer' }}>✕</button>
-              </div>
-
-              {/* Invoice summary */}
-              <div style={{ margin:'14px 20px', background:'linear-gradient(135deg,#1a3a42,#28798d)', borderRadius:14, padding:'14px 16px', color:'white' }}>
-                <div style={{ fontSize:13, fontWeight:700 }}>{payModal.supplier}</div>
-                <div style={{ fontSize:11, opacity:0.65, marginBottom:8 }}>{payModal.id}{payModal.desc ? ' · ' + payModal.desc : ''}</div>
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}>
-                  <span style={{ opacity:0.7 }}>Остаток</span>
-                  <span style={{ fontWeight:700 }}>{fmt(payModal.amount - payModal.paid, payModal.cur)}</span>
-                </div>
-              </div>
-
-              <div style={{ padding:'0 20px', display:'flex', flexDirection:'column', gap:12 }}>
-                <F label="Валюта платежа">
-                  <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                    {CURRENCIES.map(c=>(
-                      <button key={c} onClick={()=>setPayForm({...payForm,cur:c})}
-                        style={{ padding:'5px 12px', borderRadius:20, fontSize:12, fontWeight:600, border:'none', cursor:'pointer',
-                          background: payForm.cur===c ? BRAND : '#f0f9fa',
-                          color: payForm.cur===c ? 'white' : BRAND, transition:'all .15s' }}>
-                        {CUR_SIGN[c]} {c}
-                      </button>
-                    ))}
-                  </div>
-                </F>
-                <F label={`Сумма (${payForm.cur})`}>
-                  <input type="number" value={payForm.amount} onChange={e=>setPayForm({...payForm,amount:e.target.value})}
-                    placeholder="0" className={inp} style={{'--tw-ring-color':BRAND}}/>
-                  {payForm.amount && payForm.cur !== 'KZT' && (
-                    <div style={{ fontSize:11, color:'#94a3b8', marginTop:4 }}>
-                      ≈ {(Number(payForm.amount)*(Number(payForm.rate)||CUR_RATES[payForm.cur])).toLocaleString('ru-RU')} ₸
-                    </div>
-                  )}
-                </F>
-                {payForm.cur !== 'KZT' && (
-                  <F label="Курс к ₸">
-                    <input type="number" value={payForm.rate} onChange={e=>setPayForm({...payForm,rate:e.target.value})}
-                      placeholder={String(CUR_RATES[payForm.cur])} className={inp} style={{'--tw-ring-color':BRAND}}/>
-                  </F>
-                )}
-                <F label="Дата и время оплаты">
-                  <input type="datetime-local" value={payForm.date} onChange={e=>setPayForm({...payForm,date:e.target.value})}
-                    className={inp} style={{'--tw-ring-color':BRAND}}/>
-                </F>
-                <F label="Комментарий">
-                  <input value={payForm.comment} onChange={e=>setPayForm({...payForm,comment:e.target.value})}
-                    placeholder="Назначение платежа…" className={inp} style={{'--tw-ring-color':BRAND}}/>
-                </F>
-              </div>
-
-              <div style={{ padding:'14px 20px 18px', display:'flex', gap:10, marginTop:6 }}>
-                <button onClick={()=>setPayModal(null)}
-                  style={{ flex:1, padding:'11px', borderRadius:12, background:'#f1f5f9', color:'#64748b', fontSize:13, fontWeight:500, border:'none', cursor:'pointer' }}>
-                  Отмена
-                </button>
-                <button onClick={submitPayment}
-                  style={{ flex:1, padding:'11px', borderRadius:12, background:'#059669', color:'white', fontSize:13, fontWeight:600, border:'none', cursor:'pointer', opacity:!payForm.amount?0.5:1 }}>
-                  Подтвердить
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {PayModal}
     </div>
   );
 }

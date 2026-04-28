@@ -148,7 +148,7 @@ export function DataProvider({ children, onReady }) {
       setSubscriptions(p => p.filter(s => !(s.tg_id === tgId && s.order_id === orderId)));
       deleteRow('Подписки', `${tgId}_${orderId}`);
     } else {
-      const sub = { tg_id: tgId, order_id: orderId, order_title: orderTitle };
+      const sub = { id: `${tgId}_${orderId}`, tg_id: tgId, order_id: orderId, order_title: orderTitle };
       setSubscriptions(p => [...p, sub]);
       appendRow('Подписки', sub);
     }
