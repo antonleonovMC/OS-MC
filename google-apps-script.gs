@@ -45,7 +45,7 @@ function setupSheets() {
       'city','product_group','date_start','date_end','product_name','stock','sales_total','sales_per_day'
     ],
     'Настройки': [
-      'key','value'
+      'Город','Категория товаров'
     ],
     'Аналитика': [
       '','','','','',  // твой свободный лист — заголовки не трогаем
@@ -96,30 +96,32 @@ function setupSheets() {
     Logger.log('Удалён пустой лист по умолчанию');
   }
 
-  // Seed Настройки with city and product group lists if empty
+  // Заполняем Настройки: столбец A = города, столбец B = категории (по одному значению в строке)
   const settingsSheet = SS.getSheetByName('Настройки');
   if (settingsSheet && settingsSheet.getLastRow() <= 1) {
-    const seeds = [
-      ['cities',         'Астана,Алматы,Шымкент,Актобе,Атырау'],
-      ['product_groups', 'Кофе,Чай,Сиропы,Оборудование,Расходники'],
-    ];
-    seeds.forEach(row => settingsSheet.appendRow(row));
+    const cities   = ['Астана','Алматы','Шымкент','Актобе','Атырау'];
+    const groups   = ['Кофе','Чай','Сиропы','Оборудование','Расходники'];
+    const maxRows  = Math.max(cities.length, groups.length);
+    for (let i = 0; i < maxRows; i++) {
+      settingsSheet.appendRow([cities[i] || '', groups[i] || '']);
+    }
   }
 
-  // Add dropdown validation to "Данные дашборда" columns 1 (city) and 2 (product_group)
-  const dashSheet = SS.getSheetByName('Данные дашборда');
-  if (dashSheet) {
-    const cities        = ['Астана','Алматы','Шымкент','Актобе','Атырау'];
-    const productGroups = ['Кофе','Чай','Сиропы','Оборудование','Расходники'];
+  // Дропдауны в "Данные дашборда" ссылаются на диапазоны из листа Настройки
+  // — добавил город/категорию в Настройки → сразу появляется в выпадающем списке
+  const dashSheet     = SS.getSheetByName('Данные дашборда');
+  const settingsSheet2 = SS.getSheetByName('Настройки');
+  if (dashSheet && settingsSheet2) {
+    const lastRow = Math.max(settingsSheet2.getLastRow(), 2);
 
     const cityRule = SpreadsheetApp.newDataValidation()
-      .requireValueInList(cities, true)
+      .requireValueInRange(settingsSheet2.getRange(2, 1, lastRow - 1, 1), true)
       .setAllowInvalid(false)
       .build();
     dashSheet.getRange(2, 1, 1000, 1).setDataValidation(cityRule);
 
     const groupRule = SpreadsheetApp.newDataValidation()
-      .requireValueInList(productGroups, true)
+      .requireValueInRange(settingsSheet2.getRange(2, 2, lastRow - 1, 1), true)
       .setAllowInvalid(false)
       .build();
     dashSheet.getRange(2, 2, 1000, 1).setDataValidation(groupRule);
