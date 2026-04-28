@@ -41,7 +41,7 @@ export default function Coffee({ user }) {
   const [newCity,  setNewCity]  = useState('Астана');
   const [items,    setItems]    = useState([{ name:'', qty:'', unit:'кг' }]);
 
-  const canCreate = ['director','manager','director_tk'].includes(user.role);
+  const canCreate = ['admin','director','manager','director_tk'].includes(user.role);
   const filtered  = orders.filter(o => cityF === 'Все' || o.city === cityF);
 
   // helpers

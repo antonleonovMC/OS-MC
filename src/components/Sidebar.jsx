@@ -8,7 +8,7 @@ export default function Sidebar({ user, page, setPage, onLogout }) {
     { id:"dashboard", label:"Дашборд",        icon:"⊞", group:"Главное"     },
     { id:"logistics", label:"Логистика",       icon:"🚚", group:"Операции"   },
     { id:"requests",  label:"Заявки на закуп", icon:"📋", group:"Операции"   },
-    { id:"coffee",    label:"Кофе-заказы",     icon:"☕", group:"Операции"   },
+    { id:"coffee",    label:"Заказ КОФЕЕЕЕЕ",  icon:"☕", group:"Операции"   },
     { id:"payments",  label:"Оплата",          icon:"💳", group:"Финансы"    },
     { id:"tasks",     label:"Задачи отдела",   icon:"✓",  group:"Управление" },
     { id:"feedback",  label:"Обратная связь",  icon:"💬", group:"Прочее"     },

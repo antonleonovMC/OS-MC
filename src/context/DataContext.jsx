@@ -108,6 +108,19 @@ export function DataProvider({ children, onReady }) {
       onReady?.();
     }
     load();
+    // Real-time polling every 30s
+    const poll = setInterval(async () => {
+      if (!sheetsReady()) return;
+      try {
+        const [ordersRaw, reqRaw, cofRaw] = await Promise.all([
+          fetchSheet('Заказы'), fetchSheet('Заявки'), fetchSheet('Кофе'),
+        ]);
+        setOrders(ordersRaw.map(mapOrder));
+        setRequests(reqRaw.map(mapRequest));
+        setCoffees(cofRaw.map(mapCoffee));
+      } catch {}
+    }, 30000);
+    return () => clearInterval(poll);
   }, []);
 
   // ── ORDERS ─────────────────────────────────────────────────────────────

@@ -60,8 +60,9 @@ export default function Logistics({ user }) {
   const [whFilter, setWhFilter] = useState('Все склады');
   const [statusFilter, setStatusFilter] = useState(null);
   const [showCreate, setShowCreate]     = useState(false);
-  const [editMode, setEditMode]         = useState(false);
-  const [editData, setEditData]         = useState(null);
+  const [editMode,  setEditMode]  = useState(false);
+  const [editData,  setEditData]  = useState(null);
+  const [subOpen,   setSubOpen]   = useState(true);
   const [newOrder, setNewOrder] = useState({
     title:'', supplier:'', warehouse:'Астана', planDate:'', status:'Принят', comment:'',
     country:'РК', items:[{ name:'', qty:'', unit:'шт' }],
@@ -124,12 +125,12 @@ export default function Logistics({ user }) {
     toast.success(`Заказ ${o.code} создан`);
   };
 
-  const toggleSub = (e) => {
+  const toggleSub = (order, e) => {
     e.stopPropagation();
-    if (!sel || !user.tg_id) return;
-    toggleSubscription(user.tg_id, sel.id, sel.title);
-    const willSub = !isSubscribed(sel.id);
-    toast(willSub ? 'Подписан на обновления' : 'Подписка отменена', { duration: 2000 });
+    if (!order || !user.tg_id) return;
+    const wasSub = isSubscribed(order.id);
+    toggleSubscription(user.tg_id, order.id, order.title);
+    toast(wasSub ? 'Подписка отменена' : 'Подписан на обновления', { duration: 2000 });
   };
 
   const changeStatus = (id, s) => {
@@ -276,7 +277,7 @@ export default function Logistics({ user }) {
                   ✏️ Изменить
                 </button>
               )}
-              <button onClick={toggleSub} title={isSubscribed(sel.id) ? 'Отписаться' : 'Подписаться'}>
+              <button onClick={e => toggleSub(sel, e)} title={isSubscribed(sel.id) ? 'Отписаться' : 'Подписаться'}>
                 <IcoBell active={isSubscribed(sel.id)} />
               </button>
               <Badge s={sel.status} />
@@ -428,42 +429,39 @@ export default function Logistics({ user }) {
       </div>
 
       {/* Мои подписки */}
-      {Object.values(subscribed).some(Boolean) && (
+      {subscriptions.some(s => s.tg_id === user.tg_id) && (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <button onClick={() => setSubOpen(v=>!v)}
+          <button onClick={() => setSubOpen(v => !v)}
             className="px-5 py-3 border-b border-gray-50 flex items-center gap-2 w-full hover:bg-gray-50 transition-colors">
             <span style={{ width:22, height:22, borderRadius:7, background:'#e8f4f6', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
               <IcoBell active={true} />
             </span>
             <span className="text-sm font-semibold text-gray-700">Мои подписки</span>
-            <span className="text-xs font-bold text-gray-400 ml-1">{orders.filter(o=>subscribed[o.id]).length}</span>
-            <span className="ml-auto text-gray-400 transition-transform duration-200" style={{ transform: subOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display:'inline-block' }}>
+            <span className="text-xs font-bold text-gray-400 ml-1">
+              {subscriptions.filter(s => s.tg_id === user.tg_id).length}
+            </span>
+            <span className="ml-auto text-gray-400" style={{ transform: subOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display:'inline-block', transition:'transform .2s' }}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </span>
           </button>
           <AnimatePresence initial={false}>
             {subOpen && (
-              <motion.div
-                initial={{ height:0, opacity:0 }} animate={{ height:'auto', opacity:1 }} exit={{ height:0, opacity:0 }}
-                transition={{ duration:0.22, ease:'easeInOut' }}
-                style={{ overflow:'hidden' }}>
+              <motion.div initial={{ height:0, opacity:0 }} animate={{ height:'auto', opacity:1 }} exit={{ height:0, opacity:0 }}
+                transition={{ duration:0.22, ease:'easeInOut' }} style={{ overflow:'hidden' }}>
                 <div className="divide-y divide-gray-50">
-                  {orders.filter(o => subscribed[o.id]).map(o => (
-                    <motion.div key={o.id}
-                      initial={{ opacity:0, x:-8 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:-8 }}
-                      transition={{ duration:0.2 }}
-                      onClick={() => setSel(o)}
+                  {orders.filter(o => isSubscribed(o.id)).map(o => (
+                    <div key={o.id} onClick={() => setSel(o)}
                       className="px-5 py-3 hover:bg-gray-50 cursor-pointer transition-colors flex items-center gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-gray-800 truncate">{o.title}</div>
                         <div className="text-xs text-gray-400 mt-0.5">{o.supplier} · {o.planDate}</div>
                       </div>
                       <Badge s={o.status} />
-                      <motion.button onClick={e=>toggleSub(o.id,e)} whileTap={{scale:0.8}}
+                      <button onClick={e => toggleSub(o, e)}
                         className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 flex-shrink-0">
                         <IcoBell active={true} />
-                      </motion.button>
-                    </motion.div>
+                      </button>
+                    </div>
                   ))}
                 </div>
               </motion.div>
@@ -502,13 +500,11 @@ export default function Logistics({ user }) {
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge s={o.status} />
-                      <motion.button
-                        onClick={e => toggleSub(o.id, e)}
-                        whileTap={{ scale: 0.8 }}
+                      <button onClick={e => toggleSub(o, e)}
                         className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-gray-100"
-                        title={subscribed[o.id] ? 'Отписаться' : 'Подписаться на обновления'}>
-                        <IcoBell active={subscribed[o.id]} />
-                      </motion.button>
+                        title={isSubscribed(o.id) ? 'Отписаться' : 'Подписаться на обновления'}>
+                        <IcoBell active={isSubscribed(o.id)} />
+                      </button>
                     </div>
                   </div>
                   <div className="text-xs text-gray-500 mb-2">{o.supplier}</div>

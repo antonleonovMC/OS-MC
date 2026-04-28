@@ -24,7 +24,7 @@ const PAGE_META = {
   dashboard: { title:'Дашборд'        },
   logistics: { title:'Логистика'       },
   requests:  { title:'Заявки на закуп' },
-  coffee:    { title:'Кофе-заказы'     },
+  coffee:    { title:'Заказ КОФЕЕЕЕЕ'  },
   payments:  { title:'Оплата'          },
   tasks:     { title:'Задачи'          },
   feedback:  { title:'Обратная связь'  },

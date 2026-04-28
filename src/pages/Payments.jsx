@@ -315,8 +315,8 @@ export default function Payments() {
           <motion.div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
             initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
             style={{background:'rgba(0,0,0,0.5)'}} onClick={()=>setShowForm(false)}>
-            <motion.div initial={{y:40,opacity:0}} animate={{y:0,opacity:1}} exit={{y:40,opacity:0}}
-              transition={{type:'spring',stiffness:380,damping:38}}
+            <motion.div initial={{y:32,opacity:0}} animate={{y:0,opacity:1}} exit={{y:20,opacity:0}}
+              transition={{duration:0.22,ease:'easeOut'}}
               className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
               onClick={e=>e.stopPropagation()}>
               <div style={{ padding:'18px 20px 14px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
@@ -379,8 +379,8 @@ export default function Payments() {
           <motion.div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
             initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
             style={{background:'rgba(0,0,0,0.5)'}} onClick={()=>setPayModal(null)}>
-            <motion.div initial={{y:40,opacity:0}} animate={{y:0,opacity:1}} exit={{y:40,opacity:0}}
-              transition={{type:'spring',stiffness:380,damping:38}}
+            <motion.div initial={{y:32,opacity:0}} animate={{y:0,opacity:1}} exit={{y:20,opacity:0}}
+              transition={{duration:0.22,ease:'easeOut'}}
               className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
               onClick={e=>e.stopPropagation()}>
               <div style={{ padding:'18px 20px 14px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
