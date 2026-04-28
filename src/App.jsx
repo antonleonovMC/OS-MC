@@ -17,7 +17,7 @@ import Sidebar    from './components/Sidebar';
 import BottomNav  from './components/BottomNav';
 
 const BRAND = '#28798d';
-const LOGO  = 'https://i.ibb.co/tT12Zg0C/4.png';
+const LOGO  = '/logo.png';
 
 const PAGE_META = {
   dashboard: { title:'Дашборд'        },

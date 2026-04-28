@@ -20,7 +20,7 @@ export default function Sidebar({ user, page, setPage, onLogout }) {
       {/* Logo */}
       <button onClick={() => setPage("dashboard")} className="p-4 border-b border-slate-800 flex items-center gap-2.5 hover:bg-slate-800/50 transition-colors w-full text-left">
         <img
-          src="https://i.ibb.co/tT12Zg0C/4.png"
+          src="/logo.png"
           alt="Master Coffee"
           className="w-9 h-9 rounded-xl object-contain bg-white p-0.5"
           onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }}

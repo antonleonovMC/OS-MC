@@ -3,7 +3,7 @@ import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 
 const BRAND  = '#28798d';
 const DARK   = '#1a3a42';
-const LOGO   = 'https://i.ibb.co/tT12Zg0C/4.png';
+const LOGO   = '/logo.png';
 const HERO   = 'https://i.ibb.co/whDnJ1FC/image.png';
 
 const TRACK_W  = 280;

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { USERS, ROLE_LABELS, ROLE_ACCESS } from '../data/constants';
 
 const BRAND = '#28798d';
-const LOGO  = 'https://i.ibb.co/tT12Zg0C/4.png';
+const LOGO  = '/logo.png';
 
 const PAGE_LABELS = {
   dashboard:"Дашборд", logistics:"Логистика", requests:"Заявки",
