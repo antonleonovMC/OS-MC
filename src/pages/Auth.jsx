@@ -106,9 +106,23 @@ export default function Auth({ onLogin }) {
       last_name:  tgUser.last_name  || '',
       status: 'Ожидает', role: '',
     });
+    const cbBase = `${tgUser.id}|${tgUser.username||''}|${tgUser.first_name||''}|${tgUser.last_name||''}`;
     await notifyTelegram(
       ADMIN_TG_ID,
-      `Новый запрос на доступ\n\n${fullName}\n${username}\nID: ${tgUser.id}\n\nДобавьте в лист Сотрудники с нужной ролью.`,
+      `🔐 Запрос на доступ\n\n👤 ${fullName}\n${username}\nID: ${tgUser.id}\n\nВыберите роль или отклоните:`,
+      { inline_keyboard: [
+        [
+          { text: '👁 Читатель',    callback_data: `grant|reader|${cbBase}` },
+          { text: '📦 Завскладом',  callback_data: `grant|warehouse|${cbBase}` },
+        ],
+        [
+          { text: '🏢 Директор ТК', callback_data: `grant|director_tk|${cbBase}` },
+          { text: '⚙️ Админ',       callback_data: `grant|admin|${cbBase}` },
+        ],
+        [
+          { text: '❌ Отклонить',   callback_data: `deny|${cbBase}` },
+        ],
+      ]},
     );
     setPhase('requested');
   }
