@@ -115,9 +115,40 @@ function doGet(e) {
   }
 }
 
+const BOT_TOKEN = '8740508950:AAGddYGgY1DSC93wPIt_lG0kx2PGAYHAK3o';
+const APP_URL   = 'https://os-mc.vercel.app';
+
+function sendTg(chatId, text, replyMarkup) {
+  const payload = { chat_id: chatId, text: text };
+  if (replyMarkup) payload.reply_markup = replyMarkup;
+  UrlFetchApp.fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage', {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  });
+}
+
 function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents);
+
+    // ── Telegram webhook ──────────────────────────────────────────
+    if (body.message || body.callback_query) {
+      const msg    = body.message || body.callback_query?.message;
+      const chatId = msg?.chat?.id;
+      const text   = msg?.text || '';
+
+      if (chatId && text.startsWith('/start')) {
+        sendTg(chatId,
+          'Master Coffee OS\nНажмите кнопку ниже чтобы открыть приложение:',
+          { inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: APP_URL } }]] }
+        );
+      }
+      return json({ ok: true });
+    }
+
+    // ── Sheets API ────────────────────────────────────────────────
     const { action, sheet: sheetName, id, data } = body;
 
     const sheet = SS.getSheetByName(sheetName);

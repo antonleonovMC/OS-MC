@@ -21,28 +21,41 @@ export default function Auth({ onLogin }) {
   useEffect(() => {
     if (!users?.length) return;
 
-    // 1. Telegram Mini App auto-detect
-    try {
-      const tg = window?.Telegram?.WebApp;
-      if (tg?.initDataUnsafe?.user?.id) {
-        handleTgUser(tg.initDataUnsafe.user);
-        return;
-      }
-    } catch {}
+    // Tell Telegram the app is ready (required for Mini App)
+    try { window.Telegram?.WebApp?.ready(); } catch {}
 
-    // 2. localStorage saved tg_id
-    const savedId = Number(localStorage.getItem('mc_tg_id'));
-    if (savedId) {
-      const found = users.find(u => u.tg_id && Number(u.tg_id) === savedId);
-      if (found) {
-        setPhase('logging_in');
-        setTimeout(() => onLogin(found), 800);
-        return;
+    function tryLogin() {
+      // 1. Telegram Mini App auto-detect
+      try {
+        const tg = window?.Telegram?.WebApp;
+        const tgU = tg?.initDataUnsafe?.user;
+        if (tgU?.id) {
+          handleTgUser(tgU);
+          return true;
+        }
+      } catch {}
+
+      // 2. localStorage saved tg_id
+      const savedId = Number(localStorage.getItem('mc_tg_id'));
+      if (savedId) {
+        const found = users.find(u => u.tg_id && Number(u.tg_id) === savedId);
+        if (found) {
+          setPhase('logging_in');
+          setTimeout(() => onLogin(found), 600);
+          return true;
+        }
       }
+
+      return false;
     }
 
-    // 3. Show Telegram Login Widget
-    setPhase('widget');
+    // Try immediately, then retry after 300ms (Telegram WebApp may init late)
+    if (!tryLogin()) {
+      const t = setTimeout(() => {
+        if (!tryLogin()) setPhase('widget');
+      }, 300);
+      return () => clearTimeout(t);
+    }
   }, [users]);
 
   // ── Inject Telegram Login Widget ───────────────────────────────────────────
