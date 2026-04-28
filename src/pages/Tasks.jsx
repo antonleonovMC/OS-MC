@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { INIT_TASKS, USERS, ROLE_LABELS } from '../data/constants';
+import { USERS, ROLE_LABELS } from '../data/constants';
+import { useData } from '../context/DataContext';
 
 const BRAND = '#28798d';
 
@@ -38,7 +39,7 @@ function FieldLabel({ children }) {
 }
 
 export default function Tasks({ user }) {
-  const [tasks,     setTasks]     = useState(INIT_TASKS);
+  const { tasks, addTask, updateTask, moveTask } = useData();
   const [modal,     setModal]     = useState(null);   // task detail modal
   const [createCol, setCreateCol] = useState(null);   // create modal, pre-set column
   const [form,      setForm]      = useState(EMPTY_FORM);
@@ -51,36 +52,37 @@ export default function Tasks({ user }) {
   const cols  = Object.entries(COL_STYLE).map(([id, s]) => ({ id, ...s }));
 
   // ── Task mutations ───────────────────────────────────────────────────────────
+  const patch = (id, p) => { updateTask(id, p); setModal(t => t?.id===id ? {...t,...p} : t); };
+
   const addComment = () => {
     if (!comment.trim() || !modal) return;
     const now   = new Date().toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
     const entry = `${user.name.split(' ')[0]}${tag&&other?' @'+other.name.split(' ')[0]:''}: ${comment}|${now}|unread`;
-    const upd   = tasks.map(t => t.id === modal.id ? { ...t, comments:[...t.comments, entry] } : t);
-    setTasks(upd); setModal(upd.find(t => t.id === modal.id)); setComment(''); setTag(false);
+    const comments = [...modal.comments, entry];
+    patch(modal.id, { comments }); setComment(''); setTag(false);
   };
 
   const markRead = (taskId, ci) => {
     const now = new Date().toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
-    const upd = tasks.map(t => t.id !== taskId ? t : {
-      ...t, comments: t.comments.map((c,i) => i===ci ? c.replace('|unread',`|✓✓ ${now}`) : c)
-    });
-    setTasks(upd); setModal(upd.find(t => t.id === modal.id));
+    const t = tasks.find(t=>t.id===taskId); if (!t) return;
+    const comments = t.comments.map((c,i) => i===ci ? c.replace('|unread',`|✓✓ ${now}`) : c);
+    patch(taskId, { comments });
   };
 
-  const moveTask    = (id, status) => { const u=tasks.map(t=>t.id===id?{...t,status}:t); setTasks(u); setModal(u.find(t=>t.id===id)); };
-  const toggleSub   = (id, si)    => { const u=tasks.map(t=>t.id===id?{...t,subtasks:t.subtasks.map((s,i)=>i===si?{...s,done:!s.done}:s)}:t); setTasks(u); setModal(u.find(t=>t.id===id)); };
-  const removeSub   = (id, si)    => { const u=tasks.map(t=>t.id===id?{...t,subtasks:t.subtasks.filter((_,i)=>i!==si)}:t); setTasks(u); setModal(u.find(t=>t.id===id)); };
-  const addSub      = (id)        => { const u=tasks.map(t=>t.id===id?{...t,subtasks:[...t.subtasks,{t:'',done:false}]}:t); setTasks(u); setModal(u.find(t=>t.id===id)); };
-  const editSubText = (id, si, v) => { const u=tasks.map(t=>t.id===id?{...t,subtasks:t.subtasks.map((s,i)=>i===si?{...s,t:v}:s)}:t); setTasks(u); setModal(u.find(t=>t.id===id)); };
-  const changeDate  = (id, due)   => { const u=tasks.map(t=>t.id===id?{...t,due}:t); setTasks(u); setModal(u.find(t=>t.id===id)); };
-  const changePri   = (id, priority) => { const u=tasks.map(t=>t.id===id?{...t,priority}:t); setTasks(u); setModal(u.find(t=>t.id===id)); };
+  const localMoveTask = (id, status) => { moveTask(id, status); setModal(t => t?.id===id ? {...t,status} : t); };
+  const toggleSub   = (id, si)    => { const t=tasks.find(t=>t.id===id); if(!t)return; const subtasks=t.subtasks.map((s,i)=>i===si?{...s,done:!s.done}:s); patch(id,{subtasks}); };
+  const removeSub   = (id, si)    => { const t=tasks.find(t=>t.id===id); if(!t)return; const subtasks=t.subtasks.filter((_,i)=>i!==si); patch(id,{subtasks}); };
+  const addSub      = (id)        => { const t=tasks.find(t=>t.id===id); if(!t)return; const subtasks=[...t.subtasks,{t:'',done:false}]; patch(id,{subtasks}); };
+  const editSubText = (id, si, v) => { const t=tasks.find(t=>t.id===id); if(!t)return; const subtasks=t.subtasks.map((s,i)=>i===si?{...s,t:v}:s); patch(id,{subtasks}); };
+  const changeDate  = (id, due)   => { patch(id, { due }); };
+  const changePri   = (id, priority) => { patch(id, { priority }); };
 
   const handleFile = e => {
     const f = e.target.files[0]; if (!f||!modal) return;
     const now = new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
     const entry = `${user.name.split(' ')[0]}: 📎 ${f.name}|${now}|✓✓ прикреплён`;
-    const upd = tasks.map(t => t.id===modal.id?{...t,comments:[...t.comments,entry]}:t);
-    setTasks(upd); setModal(upd.find(t=>t.id===modal.id));
+    const comments = [...modal.comments, entry];
+    patch(modal.id, { comments });
   };
 
   const createTask = () => {
@@ -92,7 +94,7 @@ export default function Tasks({ user }) {
       subtasks: form.subtasks.filter(s => s.t.trim()).map(s => ({ t:s.t.trim(), done:false })),
       comments: [],
     };
-    setTasks(p => [...p, newTask]);
+    addTask(newTask);
     setCreateCol(null); setForm(EMPTY_FORM);
     toast.success('Задача создана');
   };
@@ -260,7 +262,7 @@ export default function Tasks({ user }) {
               <FieldLabel>Переместить</FieldLabel>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                 {cols.map(c => (
-                  <button key={c.id} onClick={() => moveTask(modal.id, c.id)}
+                  <button key={c.id} onClick={() => localMoveTask(modal.id, c.id)}
                     style={{ padding:'5px 12px', borderRadius:20, fontSize:12, fontWeight:500, border:'none', cursor:'pointer', transition:'all .15s',
                       background: modal.status===c.id ? BRAND : '#f0f9fa',
                       color:      modal.status===c.id ? 'white' : BRAND }}>

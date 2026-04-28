@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { INIT_COFFEE_ORDERS } from '../data/constants';
+import { useData } from '../context/DataContext';
 
 const BRAND   = '#28798d';
 const COFFEES = ["Эспрессо Бленд","Бразилия Можиана","Space Coffee","Колумбия Уила","Эфиопия Йиргачефф"];
@@ -14,12 +14,6 @@ const STATUS_STYLE = {
   'Отправлен': { bg:'#f5f3ff', color:'#7c3aed', dot:'#8b5cf6' },
   'Получен':   { bg:'#ecfdf5', color:'#059669', dot:'#10b981' },
 };
-
-// Seed data — добавляем shipped:0 к каждому item
-const seedOrders = INIT_COFFEE_ORDERS.map(o => ({
-  ...o,
-  items: o.items.map(it => ({ ...it, shipped: 0 })),
-}));
 
 function StatusPill({ s }) {
   const st = STATUS_STYLE[s] || { bg:'#f1f5f9', color:'#64748b', dot:'#94a3b8' };
@@ -38,7 +32,7 @@ function FieldLabel({ children }) {
 }
 
 export default function Coffee({ user }) {
-  const [orders,   setOrders]   = useState(seedOrders);
+  const { coffees: orders, addCoffeeOrder, updateCoffeeOrder } = useData();
   const [cityF,    setCityF]    = useState('Все');
   const [showForm, setShowForm] = useState(false);
   const [sel,      setSel]      = useState(null);
@@ -66,14 +60,14 @@ export default function Coffee({ user }) {
       status: 'Принят',
       items:  valid.map(i => ({ ...i, qty: Number(i.qty), shipped: 0 })),
     };
-    setOrders(p => [newOrder, ...p]);
+    addCoffeeOrder(newOrder);
     setShowForm(false);
     setItems([{ name:'', qty:'', unit:'кг' }]);
     toast.success(`Заказ ${newOrder.id} отправлен в обжарку`);
   };
 
   const changeStatus = (id, s) => {
-    setOrders(p => p.map(o => o.id === id ? { ...o, status: s } : o));
+    updateCoffeeOrder(id, { status: s });
     setSel(p => p ? { ...p, status: s } : p);
     toast.success(`Статус → ${s}`);
   };
@@ -88,26 +82,18 @@ export default function Coffee({ user }) {
     const { orderId, itemIdx } = shipModal;
     const qty = Number(shipQty);
     if (!qty || qty <= 0) return;
-    setOrders(prev => prev.map(o => {
-      if (o.id !== orderId) return o;
-      const newItems = o.items.map((it, i) => {
-        if (i !== itemIdx) return it;
-        const newShipped = Math.min(Number(it.shipped||0) + qty, Number(it.qty));
-        return { ...it, shipped: newShipped };
-      });
-      // Авто-статус: всё отгружено → Отправлен
-      const allShipped = newItems.every(it => Number(it.shipped||0) >= Number(it.qty));
-      const updated = { ...o, items: newItems };
-      if (allShipped && o.status !== 'Получен') updated.status = 'Отправлен';
-      return updated;
-    }));
-    // Обновить sel если открыт
-    setSel(p => {
-      if (!p || p.id !== orderId) return p;
-      const freshOrder = { ...getOrder(orderId) }; // нужен после setOrders
-      return null; // переоткрываем через updatedSel ниже
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+    const newItems = order.items.map((it, i) => {
+      if (i !== itemIdx) return it;
+      return { ...it, shipped: Math.min(Number(it.shipped||0) + qty, Number(it.qty)) };
     });
-    toast.success(`Отгружено ${qty} ${getOrder(orderId)?.items[itemIdx]?.unit}`);
+    const allShipped = newItems.every(it => Number(it.shipped||0) >= Number(it.qty));
+    const patch = { items: newItems };
+    if (allShipped && order.status !== 'Получен') patch.status = 'Отправлен';
+    updateCoffeeOrder(orderId, patch);
+    setSel(p => p?.id === orderId ? { ...p, ...patch } : p);
+    toast.success(`Отгружено ${qty} ${order.items[itemIdx]?.unit}`);
     setShipModal(null);
     setShipQty('');
   };
