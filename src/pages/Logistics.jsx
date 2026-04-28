@@ -54,75 +54,202 @@ const itemVariants = {
 };
 
 export default function Logistics({ user }) {
-  const { orders, addOrder, updateOrderStatus } = useData();
-  const setOrders = () => {}; // unused — mutations go via context
-  const [sel, setSel]                     = useState(null);
-  const [search, setSearch]               = useState("");
-  const [whFilter, setWhFilter]           = useState("Все склады");
-  const [statusFilter, setStatusFilter]   = useState(null);
-  const [showCreate, setShowCreate]       = useState(false);
-  const [subscribed, setSubscribed]       = useState({});
-  const [subOpen, setSubOpen]             = useState(true);
-  const [newOrder, setNewOrder]           = useState({
-    title:"", supplier:"", warehouse:"Астана", planDate:"", status:"Принят", comment:"",
-    country:"РК", items:[{ name:"", qty:"", unit:"шт" }],
+  const { orders, addOrder, updateOrderStatus, updateOrder, subscriptions, toggleSubscription } = useData();
+  const [sel, setSel]           = useState(null);
+  const [search, setSearch]     = useState('');
+  const [whFilter, setWhFilter] = useState('Все склады');
+  const [statusFilter, setStatusFilter] = useState(null);
+  const [showCreate, setShowCreate]     = useState(false);
+  const [editMode, setEditMode]         = useState(false);
+  const [editData, setEditData]         = useState(null);
+  const [newOrder, setNewOrder] = useState({
+    title:'', supplier:'', warehouse:'Астана', planDate:'', status:'Принят', comment:'',
+    country:'РК', items:[{ name:'', qty:'', unit:'шт' }],
   });
 
-  const canCreate = ["director","manager"].includes(user.role);
-  const COUNTRIES = ["РК", "РФ", "Китай", "Европа"];
+  const isAdmin   = user.role === 'admin';
+  const canCreate = isAdmin;
+  const COUNTRIES = ['РК', 'РФ', 'Китай', 'Европа'];
+
   const visibleStatuses = order =>
-    (order?.country === "РК")
-      ? STATUS_FLOW.filter(s => s !== "Таможня")
-      : STATUS_FLOW;
+    order?.country === 'РК' ? STATUS_FLOW.filter(s => s !== 'Таможня') : STATUS_FLOW;
+
+  const isSubscribed = (orderId) =>
+    subscriptions.some(s => s.tg_id === user.tg_id && s.order_id === orderId);
 
   const countFor = s => orders.filter(o =>
-    o.status === s && (whFilter === "Все склады" || o.warehouse === whFilter)
+    o.status === s && (whFilter === 'Все склады' || o.warehouse === whFilter)
   ).length;
 
   const nearest = [...orders]
-    .filter(o => o.status !== "Архив" && o.status !== "Доставлен" &&
-      (whFilter === "Все склады" || o.warehouse === whFilter))
+    .filter(o => o.status !== 'Архив' && o.status !== 'Доставлен' &&
+      (whFilter === 'Все склады' || o.warehouse === whFilter))
     .sort((a, b) => b.id - a.id)[0];
 
   const filtered = orders.filter(o =>
-    (whFilter === "Все склады" || o.warehouse === whFilter) &&
+    (whFilter === 'Все склады' || o.warehouse === whFilter) &&
     (!statusFilter || o.status === statusFilter) &&
-    (search === "" ||
+    (search === '' ||
       o.title.toLowerCase().includes(search.toLowerCase()) ||
       o.supplier.toLowerCase().includes(search.toLowerCase()) ||
       o.code.toLowerCase().includes(search.toLowerCase()))
   );
 
+  // Notify all subscribers about order change
+  async function notifySubscribers(order, changeText) {
+    const subs = subscriptions.filter(s => s.order_id === order.id);
+    if (!subs.length) return;
+    const msg = `Обновление по заказу ${order.code}\n${order.title}\n\n${changeText}`;
+    await Promise.all(subs.map(s =>
+      fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: s.tg_id, text: msg }),
+      }).catch(() => {})
+    ));
+  }
+
   const createOrder = () => {
-    if (!canCreate) return;
     const newId = orders.length + 18;
     const { date: today } = nowAstanaStr();
     const o = {
       ...newOrder, id: newId, code: genCode(newId),
       payments: [], created: today,
       items: newOrder.items.filter(i => i.name),
-      history: advanceHistory([], "Принят"),
+      history: advanceHistory([], 'Принят'),
     };
     addOrder(o);
     setShowCreate(false);
-    setNewOrder({ title:"", supplier:"", warehouse:"Астана", planDate:"", status:"Принят", comment:"", country:"РК", items:[{name:"",qty:"",unit:"шт"}] });
+    setNewOrder({ title:'', supplier:'', warehouse:'Астана', planDate:'', status:'Принят', comment:'', country:'РК', items:[{name:'',qty:'',unit:'шт'}] });
     toast.success(`Заказ ${o.code} создан`);
   };
 
-  const toggleSub = (id, e) => {
+  const toggleSub = (e) => {
     e.stopPropagation();
-    const next = !subscribed[id];
-    setSubscribed(p => ({ ...p, [id]: next }));
-    toast(next ? '🔔 Подписан на груз' : '🔕 Подписка отменена', { duration: 2000 });
+    if (!sel || !user.tg_id) return;
+    toggleSubscription(user.tg_id, sel.id, sel.title);
+    const willSub = !isSubscribed(sel.id);
+    toast(willSub ? 'Подписан на обновления' : 'Подписка отменена', { duration: 2000 });
   };
 
   const changeStatus = (id, s) => {
     const order   = orders.find(o => o.id === id);
     const history = advanceHistory(order?.history, s);
     updateOrderStatus(id, s, history);
-    setSel(prev => prev ? { ...prev, status:s, history } : prev);
+    setSel(prev => prev ? { ...prev, status: s, history } : prev);
+    notifySubscribers(order, `Новый статус: ${s}`);
     toast.success(`Статус изменён → ${s}`);
   };
+
+  const startEdit = () => {
+    setEditData({ ...sel, items: sel.items.map(i => ({ ...i })) });
+    setEditMode(true);
+  };
+
+  const saveEdit = () => {
+    const patch = {
+      title:     editData.title,
+      supplier:  editData.supplier,
+      planDate:  editData.planDate,
+      country:   editData.country,
+      warehouse: editData.warehouse,
+      comment:   editData.comment,
+      items:     editData.items.filter(i => i.name),
+    };
+    updateOrder(sel.id, patch);
+    const updated = { ...sel, ...patch };
+    setSel(updated);
+    setEditMode(false);
+    notifySubscribers(sel, `Данные заказа обновлены администратором`);
+    toast.success('Заказ обновлён');
+  };
+
+  const setEditItem = (i, field, val) =>
+    setEditData(p => ({ ...p, items: p.items.map((it, idx) => idx === i ? { ...it, [field]: val } : it) }));
+
+  // ── Edit form (modal overlay) ────────────────────────────────────────────────
+  if (sel && editMode && editData) return (
+    <div className="space-y-4">
+      <button onClick={() => setEditMode(false)} className="flex items-center gap-1.5 text-gray-500 hover:text-gray-800 text-sm font-medium transition-colors">
+        <IcoBack /> Отмена
+      </button>
+      <div className="max-w-xl mx-auto bg-white rounded-2xl shadow-lg overflow-hidden">
+        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Редактирование · {sel.code}</div>
+            <div className="text-lg font-bold text-gray-900">Изменить заказ</div>
+          </div>
+          <Badge s={sel.status} />
+        </div>
+        <div className="p-5 space-y-3">
+          {[
+            ['Название', 'title', 'text'],
+            ['Поставщик', 'supplier', 'text'],
+            ['Дата плана', 'planDate', 'text'],
+          ].map(([label, field]) => (
+            <div key={field}>
+              <div className="text-xs text-gray-500 mb-1">{label}</div>
+              <input value={editData[field] || ''} onChange={e => setEditData(p => ({ ...p, [field]: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2"
+                style={{ '--tw-ring-color': BRAND }} />
+            </div>
+          ))}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Страна</div>
+              <select value={editData.country} onChange={e => setEditData(p => ({ ...p, country: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none">
+                {COUNTRIES.map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Склад</div>
+              <select value={editData.warehouse} onChange={e => setEditData(p => ({ ...p, warehouse: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none">
+                {WAREHOUSES.filter(w => w !== 'Все склады').map(w => <option key={w}>{w}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500 mb-1">Комментарий</div>
+            <textarea value={editData.comment || ''} onChange={e => setEditData(p => ({ ...p, comment: e.target.value }))}
+              rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none resize-none focus:ring-2"
+              style={{ '--tw-ring-color': BRAND }} />
+          </div>
+          <div>
+            <div className="text-xs text-gray-500 mb-2">Состав заказа</div>
+            <div className="space-y-2">
+              {editData.items.map((it, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <input value={it.name} onChange={e => setEditItem(i, 'name', e.target.value)}
+                    placeholder="Наименование" className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none" />
+                  <input value={it.qty} onChange={e => setEditItem(i, 'qty', e.target.value)}
+                    placeholder="Кол-во" className="w-20 px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none" />
+                  <input value={it.unit} onChange={e => setEditItem(i, 'unit', e.target.value)}
+                    placeholder="ед." className="w-14 px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none" />
+                  <button onClick={() => setEditData(p => ({ ...p, items: p.items.filter((_, idx) => idx !== i) }))}
+                    className="text-red-400 hover:text-red-600 text-lg leading-none px-1">×</button>
+                </div>
+              ))}
+              <button onClick={() => setEditData(p => ({ ...p, items: [...p.items, { name:'', qty:'', unit:'шт' }] }))}
+                className="text-sm text-teal-600 hover:text-teal-800 font-medium">+ Добавить позицию</button>
+            </div>
+          </div>
+        </div>
+        <div className="p-5 border-t border-gray-100 flex gap-3">
+          <button onClick={() => setEditMode(false)}
+            className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors">
+            Отмена
+          </button>
+          <button onClick={saveEdit}
+            className="flex-1 py-3 text-white rounded-xl text-sm font-semibold transition-colors"
+            style={{ background: BRAND }}>
+            Сохранить и уведомить
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   // ── Detail view ─────────────────────────────────────────────────────────────
   if (sel) return (
@@ -134,15 +261,26 @@ export default function Logistics({ user }) {
       <div className="max-w-xl mx-auto bg-white rounded-2xl shadow-lg overflow-hidden">
         {/* Header */}
         <div className="p-5 border-b border-gray-100">
-          <div className="flex items-start justify-between">
-            <div>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">ЗАЯВКА #{sel.id}</span>
                 <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-mono rounded-lg">{sel.code}</span>
               </div>
-              <h2 className="text-xl font-bold text-gray-900">{sel.title}</h2>
+              <h2 className="text-xl font-bold text-gray-900 truncate">{sel.title}</h2>
             </div>
-            <Badge s={sel.status} />
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {isAdmin && (
+                <button onClick={startEdit}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors text-gray-600">
+                  ✏️ Изменить
+                </button>
+              )}
+              <button onClick={toggleSub} title={isSubscribed(sel.id) ? 'Отписаться' : 'Подписаться'}>
+                <IcoBell active={isSubscribed(sel.id)} />
+              </button>
+              <Badge s={sel.status} />
+            </div>
           </div>
         </div>
 
@@ -200,7 +338,7 @@ export default function Logistics({ user }) {
         </div>
 
         {/* Change status */}
-        {["director","manager"].includes(user.role) && (
+        {isAdmin && (
           <div className="px-5 py-4 border-b border-gray-100">
             <div className="text-xs text-gray-400 mb-2 uppercase tracking-wider font-semibold">Изменить статус</div>
             <div className="flex flex-wrap gap-1.5">

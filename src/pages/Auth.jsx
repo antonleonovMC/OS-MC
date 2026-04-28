@@ -62,8 +62,8 @@ export default function Auth({ onLogin }) {
       localStorage.removeItem('mc_tg_id'); // stale id — clean up
     }
 
-    // 3. Show Login Widget
-    setPhase('widget');
+    // 3. Not in Telegram — redirect to bot
+    window.location.href = 'https://t.me/MC_OS_bot';
   }, [staff]);
 
   // ── Telegram Login Widget ─────────────────────────────────────────────────

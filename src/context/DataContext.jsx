@@ -3,7 +3,7 @@ import {
   INIT_ORDERS, INIT_REQUESTS, INIT_INVOICES, INIT_COFFEE_ORDERS, INIT_TASKS, USERS as DEFAULT_USERS,
   makeHistory, genCode,
 } from '../data/constants';
-import { fetchSheet, appendRow, updateRow, sheetsReady, parseRow } from '../lib/sheetsAPI';
+import { fetchSheet, appendRow, updateRow, deleteRow, sheetsReady, parseRow } from '../lib/sheetsAPI';
 
 const Ctx = createContext(null);
 export const useData = () => useContext(Ctx);
@@ -37,13 +37,14 @@ function mapTask(r) {
 }
 
 export function DataProvider({ children, onReady }) {
-  const [loading,  setLoading]  = useState(true);
-  const [staff,    setStaff]    = useState(DEFAULT_USERS);
-  const [orders,   setOrders]   = useState([]);
-  const [requests, setRequests] = useState([]);
-  const [invoices, setInvoices] = useState([]);
-  const [coffees,  setCoffees]  = useState([]);
-  const [tasks,    setTasks]    = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [staff,         setStaff]         = useState(DEFAULT_USERS);
+  const [orders,        setOrders]        = useState([]);
+  const [requests,      setRequests]      = useState([]);
+  const [invoices,      setInvoices]      = useState([]);
+  const [coffees,       setCoffees]       = useState([]);
+  const [tasks,         setTasks]         = useState([]);
+  const [subscriptions, setSubscriptions] = useState([]); // [{tg_id, order_id, order_title}]
 
   // ── Load all data on mount ─────────────────────────────────────────────
   useEffect(() => {
@@ -75,6 +76,11 @@ export function DataProvider({ children, onReady }) {
         setInvoices(invRaw.map(mapInvoice));
         setCoffees(cofRaw.map(mapCoffee));
         setTasks(taskRaw.map(mapTask));
+        // Load subscriptions
+        try {
+          const subsRaw = await fetchSheet('Подписки');
+          setSubscriptions(subsRaw.map(r => ({ ...r, tg_id: Number(r.tg_id), order_id: Number(r.order_id) })));
+        } catch {}
         // Merge sheet staff over defaults — sheet tg_id wins, else keep hardcoded
         if (staffRaw.length) {
           setStaff(staffRaw.map(r => {
@@ -114,6 +120,26 @@ export function DataProvider({ children, onReady }) {
     setOrders(p => p.map(o => o.id === id ? { ...o, status, history } : o));
     updateRow('Заказы', id, { status, history: JSON.stringify(history) });
   }, []);
+
+  const updateOrder = useCallback((id, patch) => {
+    setOrders(p => p.map(o => o.id === id ? { ...o, ...patch } : o));
+    const sheetPatch = { ...patch };
+    if (sheetPatch.items)   sheetPatch.items   = JSON.stringify(sheetPatch.items);
+    if (sheetPatch.history) sheetPatch.history = JSON.stringify(sheetPatch.history);
+    updateRow('Заказы', id, sheetPatch);
+  }, []);
+
+  const toggleSubscription = useCallback((tgId, orderId, orderTitle) => {
+    const exists = subscriptions.find(s => s.tg_id === tgId && s.order_id === orderId);
+    if (exists) {
+      setSubscriptions(p => p.filter(s => !(s.tg_id === tgId && s.order_id === orderId)));
+      deleteRow('Подписки', `${tgId}_${orderId}`);
+    } else {
+      const sub = { tg_id: tgId, order_id: orderId, order_title: orderTitle };
+      setSubscriptions(p => [...p, sub]);
+      appendRow('Подписки', sub);
+    }
+  }, [subscriptions]);
 
   // ── REQUESTS ────────────────────────────────────────────────────────────
   const addRequest = useCallback((req) => {
@@ -175,11 +201,11 @@ export function DataProvider({ children, onReady }) {
     <Ctx.Provider value={{
       loading,
       // data
-      staff, orders, requests, invoices, coffees, tasks,
+      staff, orders, requests, invoices, coffees, tasks, subscriptions,
       // raw setters (for complex mutations in pages)
       setOrders, setRequests, setInvoices, setCoffees, setTasks,
       // typed mutations (also sync to Sheets)
-      addOrder, updateOrderStatus,
+      addOrder, updateOrderStatus, updateOrder, toggleSubscription,
       addRequest, updateRequestStatus,
       addInvoice, updateInvoice,
       addCoffeeOrder, updateCoffeeOrder,
