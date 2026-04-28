@@ -38,22 +38,28 @@ const pageVariants = {
 
 // ── Loading screen while Sheets data is fetching ───────────────────────────
 function DataLoader() {
+  const r = 46, circ = 2 * Math.PI * r;
   return (
     <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }}
       style={{ minHeight:'100vh', background:'white', display:'flex', flexDirection:'column',
-        alignItems:'center', justifyContent:'center', gap:0 }}>
-      <div style={{ position:'relative', width:100, height:100, display:'flex',
-        alignItems:'center', justifyContent:'center', marginBottom:20 }}>
-        <svg width="100" height="100" style={{ position:'absolute', inset:0 }}>
-          <circle cx="50" cy="50" r="44" fill="none" stroke="#e8f4f6" strokeWidth="3"/>
-          <motion.circle cx="50" cy="50" r="44" fill="none" stroke={BRAND} strokeWidth="3"
-            strokeLinecap="round"
-            strokeDasharray={`${2*Math.PI*44*0.25} ${2*Math.PI*44*0.75}`}
-            style={{ originX:'50px', originY:'50px', rotate:-90 }}
-            animate={{ rotate:['-90deg','270deg'] }}
-            transition={{ duration:1.1, repeat:Infinity, ease:'linear' }}/>
+        alignItems:'center', justifyContent:'center' }}>
+      <div style={{ position:'relative', width:120, height:120,
+        display:'flex', alignItems:'center', justifyContent:'center', marginBottom:24 }}>
+        {/* Track */}
+        <svg width="120" height="120" style={{ position:'absolute', top:0, left:0 }}>
+          <circle cx="60" cy="60" r={r} fill="none" stroke="#e8f4f6" strokeWidth="3"/>
         </svg>
-        <img src={LOGO} style={{ width:52, height:52, objectFit:'contain', borderRadius:14 }}/>
+        {/* Spinning arc */}
+        <motion.svg width="120" height="120" style={{ position:'absolute', top:0, left:0 }}
+          animate={{ rotate: 360 }}
+          transition={{ duration:1.1, repeat:Infinity, ease:'linear' }}>
+          <circle cx="60" cy="60" r={r} fill="none" stroke={BRAND} strokeWidth="3"
+            strokeLinecap="round"
+            strokeDasharray={`${circ * 0.25} ${circ * 0.75}`}
+            strokeDashoffset={circ * 0.25}/>
+        </motion.svg>
+        {/* Logo */}
+        <img src={LOGO} style={{ width:56, height:56, objectFit:'contain', borderRadius:16, position:'relative', zIndex:1 }}/>
       </div>
       <div style={{ fontSize:15, fontWeight:700, color:'#1a3a42', marginBottom:4 }}>Загружаем данные…</div>
       <div style={{ fontSize:12, color:'#94a3b8' }}>Синхронизация с Google Sheets</div>

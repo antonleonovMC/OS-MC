@@ -174,12 +174,30 @@ export default function Auth({ onLogin }) {
                   Войдите через Telegram — система автоматически определит ваш аккаунт и уровень доступа
                 </div>
                 {TG_BOT ? (
-                  <div ref={widgetRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 52 }} />
+                  <>
+                    <div ref={widgetRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 52 }} />
+                    <div style={{ marginTop: 16, textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: '#cbd5e1', marginBottom: 8 }}>или откройте через бота</div>
+                      <a href={`https://t.me/${TG_BOT}`} target="_blank" rel="noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 8,
+                          padding: '10px 20px', borderRadius: 12,
+                          background: '#229ed9', color: 'white',
+                          fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                          <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-2.013 9.487c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.24 14.4l-2.95-.924c-.64-.204-.654-.64.136-.954l11.527-4.447c.537-.194 1.006.131.609.173z"/>
+                        </svg>
+                        Открыть @{TG_BOT}
+                      </a>
+                    </div>
+                  </>
                 ) : (
-                  <div style={{ padding: 14, background: '#fef3c7', borderRadius: 12,
-                    fontSize: 13, color: '#92400e', lineHeight: 1.5 }}>
-                    Откройте приложение через Telegram
-                  </div>
+                  <a href="https://t.me/MC_OS_bot" target="_blank" rel="noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8,
+                      padding: '12px 24px', borderRadius: 14,
+                      background: '#229ed9', color: 'white',
+                      fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+                    Открыть через Telegram
+                  </a>
                 )}
               </div>
             </motion.div>
