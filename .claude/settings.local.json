@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(bun *)",
+      "PowerShell(Set-Location *)",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
+      "PowerShell(bun add *)",
+      "PowerShell(Get-Content *)",
+      "Read(//c/Users/User/AppData/Local/Temp/**)",
+      "Bash(xargs grep *)",
+      "Bash(ipconfig)",
+      "Bash(grep -v \"^--$\")",
+      "WebFetch(domain:ibb.co)",
+      "Bash(npx vite *)",
+      "WebFetch(domain:i.ibb.co)"
+    ]
+  }
+}
