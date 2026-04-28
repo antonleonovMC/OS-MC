@@ -106,6 +106,25 @@ function setupSheets() {
     seeds.forEach(row => settingsSheet.appendRow(row));
   }
 
+  // Add dropdown validation to "Данные дашборда" columns 1 (city) and 2 (product_group)
+  const dashSheet = SS.getSheetByName('Данные дашборда');
+  if (dashSheet) {
+    const cities        = ['Астана','Алматы','Шымкент','Актобе','Атырау'];
+    const productGroups = ['Кофе','Чай','Сиропы','Оборудование','Расходники'];
+
+    const cityRule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(cities, true)
+      .setAllowInvalid(false)
+      .build();
+    dashSheet.getRange(2, 1, 1000, 1).setDataValidation(cityRule);
+
+    const groupRule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(productGroups, true)
+      .setAllowInvalid(false)
+      .build();
+    dashSheet.getRange(2, 2, 1000, 1).setDataValidation(groupRule);
+  }
+
   SpreadsheetApp.getUi().alert('✅ Готово! Все листы Master Coffee OS созданы.');
 }
 
