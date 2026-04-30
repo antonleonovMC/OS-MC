@@ -47,9 +47,11 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
   // sel всегда актуален: берём из reqs по id → Badge обновляется сразу
   const sel = selId ? (reqs.find(r => r.id === selId) || null) : null;
 
-  const isManager = ["admin","director_tk"].includes(user.role);
-  const myName    = user.name.split(" ").slice(0,2).join(" ");
-  const visible   = isManager ? reqs : reqs.filter(r => r.employee === myName);
+  // Только admin видит все заявки и может одобрять/отклонять.
+  // Все остальные роли — только свои заявки, без действий.
+  const isAdmin = user.role === 'admin';
+  const myName  = user.name.split(" ").slice(0,2).join(" ");
+  const visible = isAdmin ? reqs : reqs.filter(r => r.employee === myName);
   const filtered  = visible.filter(r => statusF === "Все" || r.status === statusF);
 
   const findEmployeeTgId = (employeeName) => {
@@ -146,7 +148,7 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
         </div>
 
         {/* Manager actions */}
-        {isManager && sel.status === "Ожидает" && (
+        {isAdmin && sel.status === "Ожидает" && (
           <div className="px-5 py-4 border-b border-gray-100">
             <div className="text-xs text-gray-400 mb-2 uppercase tracking-wider font-semibold">Действие</div>
             <div className="flex gap-2">
@@ -266,7 +268,7 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
       <div className="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
         <table className="w-full text-sm">
           <thead><tr className="bg-gray-50 border-b border-gray-100">
-            {["ID","Сотрудник","Категория","Товар","Кол-во","Срочность","Дата","Статус",...(isManager?["Действия"]:[])].map(h=>(
+            {["ID","Сотрудник","Категория","Товар","Кол-во","Срочность","Дата","Статус",...(isAdmin?["Действия"]:[])].map(h=>(
               <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
             ))}
           </tr></thead>
@@ -281,7 +283,7 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
                 <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.urgency==="Критично"?"bg-red-100 text-red-800":r.urgency==="Срочно"?"bg-amber-100 text-amber-800":"bg-green-100 text-green-800"}`}>• {r.urgency}</span></td>
                 <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{r.date}</td>
                 <td className="px-4 py-3 whitespace-nowrap"><Badge s={r.status}/></td>
-                {isManager && (
+                {isAdmin && (
                   <td className="px-4 py-3" onClick={e=>e.stopPropagation()}>
                     {r.status==="Ожидает"
                       ? <div className="flex gap-1.5">
@@ -318,7 +320,7 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
               <span className={`text-xs px-2 py-0.5 rounded-lg font-medium ${URGENCY_COLOR[r.urgency]||""}`}>{r.urgency}</span>
               <span className="text-xs text-gray-400 ml-auto">{r.date}</span>
             </div>
-            {isManager && r.status==="Ожидает" && (
+            {isAdmin && r.status==="Ожидает" && (
               <div className="flex gap-2 pt-2 border-t border-gray-50" onClick={e=>e.stopPropagation()}>
                 <button onClick={()=>approve(r)} className="flex-1 py-2 text-white rounded-xl text-xs font-semibold" style={{background:BRAND}}>✓ Одобрить</button>
                 <button onClick={()=>openRejectModal(r)} className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-medium">✕ Откл.</button>
