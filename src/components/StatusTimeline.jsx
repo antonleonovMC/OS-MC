@@ -1,7 +1,7 @@
 const BRAND = '#28798d';
 
 export default function StatusTimeline({ history }) {
-  const lastDoneIdx = history.filter(h => h.done).length - 1;
+  const lastDoneIdx = history.reduce((acc, h, i) => h.done ? i : acc, -1);
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:0 }}>

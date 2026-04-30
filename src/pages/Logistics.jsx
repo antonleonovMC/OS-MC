@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { WAREHOUSES, STATUS_FLOW, STATUS_DOT, genCode, makeHistory, advanceHistory, nowAstanaStr } from '../data/constants';
+import { WAREHOUSES, STATUS_FLOW, STATUS_DOT, ROASTERY_WAREHOUSE, genCode, makeHistory, advanceHistory, nowAstanaStr } from '../data/constants';
 import { useData } from '../context/DataContext';
 import Badge from '../components/Badge';
 import StatusTimeline from '../components/StatusTimeline';
@@ -54,7 +54,7 @@ const itemVariants = {
 };
 
 export default function Logistics({ user }) {
-  const { orders, addOrder, updateOrderStatus, updateOrder, subscriptions, toggleSubscription } = useData();
+  const { orders, addOrder, updateOrderStatus, updateOrder, subscriptions, toggleSubscription, staff } = useData();
   const [sel, setSel]           = useState(null);
   const [search, setSearch]     = useState('');
   const [whFilter, setWhFilter] = useState('Все склады');
@@ -96,18 +96,40 @@ export default function Logistics({ user }) {
       o.code.toLowerCase().includes(search.toLowerCase()))
   );
 
-  // Notify all subscribers about order change
-  async function notifySubscribers(order, changeText) {
-    const subs = subscriptions.filter(s => s.order_id === order.id);
-    if (!subs.length) return;
-    const msg = `Обновление по заказу ${order.code}\n${order.title}\n\n${changeText}`;
-    await Promise.all(subs.map(s =>
-      fetch('/api/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: s.tg_id, text: msg }),
-      }).catch(() => {})
-    ));
+  function notifySubscribers(order, lines) {
+    const tg_ids = subscriptions
+      .filter(s => s.order_id === order.id && s.tg_id)
+      .map(s => s.tg_id);
+    if (!tg_ids.length) return;
+
+    const text =
+      `🚚 <b>Обновление по заказу</b>\n${order.title}\n\n${lines}\n\nБлагодарю, хорошего дня 🙏`;
+
+    fetch('/api/notify-bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tg_ids, text }),
+    }).catch(() => {});
+  }
+
+  // Уведомление обжарщикам, если заказ направлен в Обж. Цех.
+  // excludeIds — чтобы не дублировать уведомление тем, кто уже подписан на заказ.
+  function notifyRoasters(order, lines, excludeIds = []) {
+    if (order.warehouse !== ROASTERY_WAREHOUSE) return;
+    const exclude = new Set(excludeIds);
+    const tg_ids = (staff || [])
+      .filter(s => s.role === 'roaster' && s.tg_id && !exclude.has(Number(s.tg_id)))
+      .map(s => Number(s.tg_id));
+    if (!tg_ids.length) return;
+
+    const text =
+      `🔥 <b>Заказ для Обжарочного цеха</b>\n${order.title}\n\n${lines}\n\nБлагодарю, хорошего дня 🙏`;
+
+    fetch('/api/notify-bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tg_ids, text }),
+    }).catch(() => {});
   }
 
   const createOrder = () => {
@@ -120,6 +142,11 @@ export default function Logistics({ user }) {
       history: advanceHistory([], 'Принят'),
     };
     addOrder(o);
+    notifyRoasters(o,
+      `🆕 <b>Новый заказ:</b> ${o.code}\n` +
+      `🏭 <b>Поставщик:</b> ${o.supplier || '—'}\n` +
+      `📅 <b>Дата плана:</b> ${o.planDate || '—'}`
+    );
     setShowCreate(false);
     setNewOrder({ title:'', supplier:'', warehouse:'Астана', planDate:'', status:'Принят', comment:'', country:'РК', items:[{name:'',qty:'',unit:'шт'}] });
     toast.success(`Заказ ${o.code} создан`);
@@ -138,7 +165,7 @@ export default function Logistics({ user }) {
     const history = advanceHistory(order?.history, s);
     updateOrderStatus(id, s, history);
     setSel(prev => prev ? { ...prev, status: s, history } : prev);
-    notifySubscribers(order, `Новый статус: ${s}`);
+    notifySubscribers(order, `🔄 <b>Статус:</b> ${order.status} → <b>${s}</b>` );
     toast.success(`Статус изменён → ${s}`);
   };
 
@@ -165,10 +192,37 @@ export default function Logistics({ user }) {
     const updated = { ...sel, ...patch };
     setSel(updated);
     setEditMode(false);
-    const changeText = statusChanged
-      ? `Данные заказа обновлены. Новый статус: ${editData.status}`
-      : `Данные заказа обновлены администратором`;
-    notifySubscribers(sel, changeText);
+
+    const diffs = [];
+    if ((editData.comment||'') !== (sel.comment||''))
+      diffs.push(editData.comment
+        ? `💬 <b>Комментарий:</b> ${editData.comment}`
+        : `💬 <b>Комментарий:</b> —`);
+    if (statusChanged)
+      diffs.push(`🔄 <b>Статус:</b> ${sel.status} → <b>${editData.status}</b>`);
+    if (editData.planDate !== sel.planDate)
+      diffs.push(`📅 <b>Дата получения:</b> ${editData.planDate}`);
+    const changeLines = diffs.length ? diffs.join('\n') : '✏️ Данные обновлены администратором';
+    notifySubscribers(updated, changeLines);
+
+    // Если получатель = Обжарочный цех — отдельно уведомить обжарщиков
+    // (исключая тех, кто уже получил уведомление как подписчики)
+    const subscriberIds = subscriptions
+      .filter(s => s.order_id === updated.id && s.tg_id)
+      .map(s => Number(s.tg_id));
+    notifyRoasters(updated, changeLines, subscriberIds);
+
+    // Если в результате редактирования склад СТАЛ Обж. Цехом
+    // (а раньше был другим), считаем это новой постановкой задачи обжарщикам.
+    const becameRoastery = sel.warehouse !== ROASTERY_WAREHOUSE && updated.warehouse === ROASTERY_WAREHOUSE;
+    if (becameRoastery) {
+      notifyRoasters(updated,
+        `🆕 <b>Заказ перенаправлен в Обжарочный цех</b>\n` +
+        `📦 <b>Код:</b> ${updated.code}\n` +
+        `📅 <b>Дата плана:</b> ${updated.planDate || '—'}`,
+        subscriberIds
+      );
+    }
     toast.success('Заказ обновлён');
   };
 

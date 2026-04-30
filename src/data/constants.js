@@ -15,18 +15,26 @@ export const USERS = [
 export const ADMIN_TG_ID = Number(import.meta.env.VITE_ADMIN_TG_ID) || 1433619908;
 
 export const ROLE_LABELS = {
-  admin:       "Администратор",
-  director_tk: "Директор ТК",
-  warehouse:   "Завскладом",
-  reader:      "Читатель",
+  admin:         "Администратор",
+  director_tk:   "Директор ТК",
+  warehouse:     "Завскладом",
+  sales_manager: "Менеджер отдела продаж",
+  roaster:       "Обжарщик",
+  reader:        "Читатель",
 };
 
 export const ROLE_ACCESS = {
-  admin:       ["dashboard","logistics","requests","tasks","coffee","payments","feedback"],
-  director_tk: ["dashboard","logistics","requests","coffee","feedback"],
-  warehouse:   ["dashboard","logistics","requests","coffee","feedback"],
-  reader:      ["dashboard","requests","feedback"],
+  admin:         ["dashboard","logistics","requests","tasks","coffee","payments","feedback"],
+  director_tk:   ["dashboard","logistics","requests","coffee","feedback"],
+  warehouse:     ["dashboard","logistics","requests","coffee","feedback"],
+  sales_manager: ["dashboard","logistics","requests","coffee","feedback"],
+  roaster:       ["dashboard","logistics","requests","coffee","feedback"],
+  reader:        ["dashboard","requests","feedback"],
 };
+
+// Склад, привязанный к роли "Обжарщик" — при создании/изменении заказа
+// с этим получателем все обжарщики получают Telegram-уведомление
+export const ROASTERY_WAREHOUSE = "Обж. Цех";
 
 // ─────────────────────────────────────────────
 //  WAREHOUSES & CURRENCIES
@@ -126,12 +134,18 @@ export function makeHistory(currentStatus, created) {
 // Используется при реальном изменении статуса — записывает текущее время Астаны
 export function advanceHistory(existingHistory, newStatus) {
   const { date, time } = nowAstanaStr();
-  return STATUS_FLOW.map(s => {
+  const newIdx = STATUS_FLOW.indexOf(newStatus);
+  return STATUS_FLOW.map((s, i) => {
     if (s === newStatus) {
       return { status: s, date, time, done: true };
     }
+    // Статусы после нового — сбрасываем (откат)
+    if (i > newIdx) {
+      return { status: s, date: "—", time: "", done: false };
+    }
+    // Статусы до нового — сохраняем прежние метки
     const existing = existingHistory?.find(h => h.status === s);
-    if (existing?.done) return existing; // сохраняем прежние временные метки
+    if (existing?.done) return existing;
     return { status: s, date: "—", time: "", done: false };
   });
 }

@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Toaster } from 'sonner';
-import { ROLE_ACCESS } from './data/constants';
-import { DataProvider } from './context/DataContext';
+import { ROLE_ACCESS, genCode, advanceHistory } from './data/constants';
+import { DataProvider, useData } from './context/DataContext';
 
 import Auth       from './pages/Auth';
 import Splash     from './pages/Splash';
@@ -30,10 +30,23 @@ const PAGE_META = {
   feedback:  { title:'Обратная связь'  },
 };
 
-const pageVariants = {
-  initial: { opacity:0, y:10 },
-  animate: { opacity:1, y:0,  transition:{ duration:0.2, ease:'easeOut' } },
-  exit:    { opacity:0, y:-6, transition:{ duration:0.12, ease:'easeIn' } },
+const PAGE_ORDER = ['dashboard','logistics','requests','coffee','payments','tasks','feedback'];
+
+// Десктоп: вертикальный fade. Мобильный: горизонтальный слайд
+const makeVariants = (dir) => {
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+  if (!isMobile) return {
+    initial: { opacity:0, y:10 },
+    animate: { opacity:1, y:0,  transition:{ duration:0.2, ease:'easeOut' } },
+    exit:    { opacity:0, y:-6, transition:{ duration:0.14, ease:'easeIn' } },
+  };
+  const x = dir > 0 ? '55%' : '-55%';
+  const xExit = dir > 0 ? '-30%' : '30%';
+  return {
+    initial: { opacity:0, x },
+    animate: { opacity:1, x:0, transition:{ duration:0.26, ease:[0.25,0.46,0.45,0.94] } },
+    exit:    { opacity:0, x:xExit, transition:{ duration:0.18, ease:'easeIn' } },
+  };
 };
 
 // ── Loading screen while Sheets data is fetching ───────────────────────────
@@ -75,12 +88,44 @@ function Inner() {
   const [user, setUser]               = useState(null);
   const [page, setPage]               = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [navDir, setNavDir]           = useState(1);
+  const { orders, addOrder } = useData();
 
   if (!user) return <Auth onLogin={u => { setUser(u); setPage('dashboard'); }} />;
 
   const access   = ROLE_ACCESS[user.role];
   const meta     = PAGE_META[page] || PAGE_META.dashboard;
-  const safePage = p => { if (access.includes(p)) { setPage(p); setSidebarOpen(false); } };
+  const safePage = p => {
+    if (access.includes(p)) {
+      const dir = PAGE_ORDER.indexOf(p) >= PAGE_ORDER.indexOf(page) ? 1 : -1;
+      setNavDir(dir);
+      setPage(p);
+      setSidebarOpen(false);
+    }
+  };
+
+  const handleCreateLogisticsOrder = (req) => {
+    const newId = (orders.length ? Math.max(...orders.map(o => Number(o.id) || 0)) : 0) + 1;
+    const today = new Date().toLocaleDateString('ru-RU');
+    const order = {
+      id: newId,
+      code: genCode(newId),
+      title: req.product || req.title || '—',
+      supplier: req.supplierCompany || '—',
+      warehouse: req.address || 'Астана',
+      planDate: req.deliveryDate || '',
+      status: 'Принят',
+      country: 'РК',
+      comment: req.comment || '',
+      items: [{ name: req.product || '—', qty: req.qty || '', unit: 'шт' }],
+      created: today,
+      history: advanceHistory([], 'Принят'),
+      payments: [],
+      from_request: req.id,
+    };
+    addOrder(order);
+    safePage('logistics');
+  };
 
   return (
     <div className="flex min-h-screen" style={{ background:'#f4f8f9' }}>
@@ -149,12 +194,12 @@ function Inner() {
             </div>
           ) : (
             <AnimatePresence mode="wait">
-              <motion.div key={page} {...pageVariants}>
+              <motion.div key={page} {...makeVariants(navDir)} style={{ overflow: 'hidden' }}>
                 {page === 'dashboard' && <Dashboard setPage={safePage} />}
                 {page === 'logistics' && <Logistics user={user} />}
-                {page === 'requests'  && <Requests  user={user} sidebarOpen={sidebarOpen} onCreateLogisticsOrder={() => safePage('logistics')} />}
+                {page === 'requests'  && <Requests  user={user} sidebarOpen={sidebarOpen} onCreateLogisticsOrder={handleCreateLogisticsOrder} />}
                 {page === 'coffee'    && <Coffee    user={user} />}
-                {page === 'payments'  && <Payments />}
+                {page === 'payments'  && <Payments user={user} />}
                 {page === 'tasks'     && <Tasks     user={user} />}
                 {page === 'feedback'  && <Feedback  user={user} />}
               </motion.div>

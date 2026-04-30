@@ -8,20 +8,54 @@ const BRAND = '#28798d';
 const STEP_LABELS = ["Контакты","Структура","Товар","Логистика","Поставщик","Итого"];
 const EMPTY_FORM = { fullName:"", email:"", dept:"", budgetDept:"", legalEntity:"", product:"", qty:"", basis:"", url:"", deliveryDate:"", address:"", contact:"", supplierCompany:"", supplierPerson:"", supplierPhone:"", comment:"", urgency:"Обычная", category:"", fileName:"" };
 
+// Вынесен на уровень модуля — иначе React пересоздаёт тип компонента
+// при каждом keystroke и перемонтирует поля → закрывается клавиатура
+function FormField({ label, children }) {
+  return (
+    <div>
+      <label className="text-xs font-semibold text-gray-500 block mb-1.5 uppercase tracking-wide">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
 const URGENCY_COLOR = { "Критично":"bg-red-100 text-red-700", "Срочно":"bg-amber-100 text-amber-700", "Обычная":"bg-green-100 text-green-700" };
 
-export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) {
-  const { requests: reqs, addRequest, updateRequestStatus } = useData();
-  const [showForm, setShowForm] = useState(false);
-  const [sel, setSel]           = useState(null);
-  const [step, setStep]         = useState(1);
-  const [statusF, setStatusF]   = useState("Все");
-  const [form, setForm]         = useState(EMPTY_FORM);
+function notifyDirect(tgId, message) {
+  const BASE = import.meta.env.VITE_SHEETS_URL;
+  if (!BASE || !tgId) return;
+  fetch(BASE, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ action: 'notify_direct', sheet: 'Заявки', data: { tg_id: tgId, message } }),
+  }).catch(() => {});
+}
 
-  const isManager = ["director","manager"].includes(user.role);
+export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) {
+  const { requests: reqs, addRequest, updateRequestStatus, staff } = useData();
+  const [showForm,    setShowForm]    = useState(false);
+  const [selId,       setSelId]       = useState(null); // только id — sel выводится из reqs
+  const [step,        setStep]        = useState(1);
+  const [statusF,     setStatusF]     = useState("Все");
+  const [form,        setForm]        = useState(EMPTY_FORM);
+  const [rejectModal, setRejectModal] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
+
+  // sel всегда актуален: берём из reqs по id → Badge обновляется сразу
+  const sel = selId ? (reqs.find(r => r.id === selId) || null) : null;
+
+  const isManager = ["admin","director_tk"].includes(user.role);
   const myName    = user.name.split(" ").slice(0,2).join(" ");
   const visible   = isManager ? reqs : reqs.filter(r => r.employee === myName);
   const filtered  = visible.filter(r => statusF === "Все" || r.status === statusF);
+
+  const findEmployeeTgId = (employeeName) => {
+    const found = (staff || []).find(s => s.name && s.name.startsWith(employeeName.split(' ')[0]));
+    return found?.tg_id || null;
+  };
 
   const submit = () => {
     const req = { id:`REQ-0${reqs.length+24}`, employee:user.name.split(" ").slice(0,2).join(" "), dept:user.dept, category:form.category||"Другое", product:form.product, qty:form.qty, urgency:form.urgency, date:new Date().toLocaleDateString("ru-RU"), status:"Ожидает", comment:form.comment };
@@ -29,18 +63,44 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
     setShowForm(false); setStep(1); setForm(EMPTY_FORM);
     toast.success("Заявка отправлена на рассмотрение");
   };
-  const approve = id => { updateRequestStatus(id, "Одобрена");  setSel(p=>p?{...p,status:"Одобрена"}:p);  toast.success("Заявка одобрена"); };
-  const reject  = id => { updateRequestStatus(id, "Отклонена"); setSel(p=>p?{...p,status:"Отклонена"}:p); toast.error("Заявка отклонена"); };
+
+  const approve = (req) => {
+    updateRequestStatus(req.id, "Одобрена");
+    onCreateLogisticsOrder?.(req);
+    toast.success("Заявка одобрена — заказ создан в логистике");
+  };
+
+  const openRejectModal = (req) => {
+    setRejectModal(req);
+    setRejectReason('');
+  };
+
+  const confirmReject = () => {
+    if (!rejectModal) return;
+    const reason = rejectReason.trim() || 'Не указана';
+    updateRequestStatus(rejectModal.id, "Отклонена", { reject_reason: reason });
+
+    const tgId = findEmployeeTgId(rejectModal.employee);
+    const msg =
+      `❌ <b>Заявка отклонена</b>\n${rejectModal.product}\n\n` +
+      `👤 <b>Сотрудник:</b> ${rejectModal.employee}\n` +
+      `💬 <b>Причина отказа:</b> ${reason}\n\n` +
+      `Благодарю, хорошего дня 🙏`;
+    notifyDirect(tgId, msg);
+
+    setRejectModal(null);
+    setRejectReason('');
+    toast.error("Заявка отклонена");
+  };
 
   const set = (key, val) => setForm(p => ({...p, [key]: val}));
   const I = (key,ph,type="text") => <input type={type} placeholder={ph} value={form[key]} onChange={e=>set(key,e.target.value)} className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2" style={{'--tw-ring-color':BRAND}}/>;
   const S = (key,opts) => <select value={form[key]} onChange={e=>set(key,e.target.value)} className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2" style={{'--tw-ring-color':BRAND}}><option value="">Выберите…</option>{opts.map(o=><option key={o}>{o}</option>)}</select>;
-  const F = ({label,children}) => <div><label className="text-xs font-semibold text-gray-500 block mb-1.5 uppercase tracking-wide">{label}</label>{children}</div>;
 
   // ── Detail view ──────────────────────────────────────────────────────────────
   if (sel) return (
     <div className="space-y-4">
-      <button onClick={() => setSel(null)} className="flex items-center gap-1.5 text-gray-500 hover:text-gray-800 text-sm font-medium transition-colors">
+      <button onClick={() => setSelId(null)} className="flex items-center gap-1.5 text-gray-500 hover:text-gray-800 text-sm font-medium transition-colors">
         <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5l-6 5 6 5"/></svg>
         Назад к списку
       </button>
@@ -90,26 +150,23 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
           <div className="px-5 py-4 border-b border-gray-100">
             <div className="text-xs text-gray-400 mb-2 uppercase tracking-wider font-semibold">Действие</div>
             <div className="flex gap-2">
-              <button onClick={() => approve(sel.id)}
+              <button onClick={() => approve(sel)}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                style={{background:BRAND}}>Одобрить</button>
-              <button onClick={() => reject(sel.id)}
-                className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200">Отклонить</button>
+                style={{background:BRAND}}>✓ Одобрить и создать заказ</button>
+              <button onClick={() => openRejectModal(sel)}
+                className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200">✕ Отклонить</button>
             </div>
           </div>
         )}
-        {isManager && sel.status === "Одобрена" && (
-          <div className="px-5 py-4 border-b border-gray-100">
-            <button onClick={() => onCreateLogisticsOrder?.(sel)}
-              className="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-              style={{background:BRAND}}>
-              Создать заказ в логистике →
-            </button>
+        {sel.reject_reason && (
+          <div className="px-5 py-3 border-b border-gray-100">
+            <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Причина отказа</div>
+            <div className="text-sm text-red-700 bg-red-50 rounded-xl p-3">{sel.reject_reason}</div>
           </div>
         )}
 
         <div className="px-5 py-4">
-          <button onClick={() => setSel(null)}
+          <button onClick={() => setSelId(null)}
             className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200">
             Закрыть
           </button>
@@ -170,15 +227,15 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
               <div className="text-xs text-gray-500 mt-2">Шаг {step} из {STEP_LABELS.length}: <span className="font-semibold text-gray-700">{STEP_LABELS[step-1]}</span></div>
             </div>
             <div className="p-5 space-y-4">
-              {step===1&&<><F label="ФИО">{I("fullName","Фамилия Имя Отчество")}</F><F label="Email">{I("email","email@mastercoffee.kz","email")}</F></>}
-              {step===2&&<><F label="Подразделение">{S("dept",["УК","ТК","Обжарка","Цех","Кофейни"])}</F><F label="Бюджетное подразделение">{I("budgetDept","Название")}</F><F label="Юр. лицо">{S("legalEntity",["ТОО Мастер Кофе","ИП Master Coffee Trade","ИП Master Coffee Roasters","ТОО Mastercoffee.kz","Другое"])}</F></>}
+              {step===1&&<><FormField label="ФИО">{I("fullName","Фамилия Имя Отчество")}</FormField><FormField label="Email">{I("email","email@mastercoffee.kz","email")}</FormField></>}
+              {step===2&&<><FormField label="Подразделение">{S("dept",["УК","ТК","Обжарка","Цех","Кофейни"])}</FormField><FormField label="Бюджетное подразделение">{I("budgetDept","Название")}</FormField><FormField label="Юр. лицо">{S("legalEntity",["ТОО Мастер Кофе","ИП Master Coffee Trade","ИП Master Coffee Roasters","ТОО Mastercoffee.kz","Другое"])}</FormField></>}
               {step===3&&<>
-                <F label="Наименование товара">{I("product","Что нужно закупить?")}</F>
-                <F label="Количество">{I("qty","100 шт")}</F>
-                <F label="Категория">{S("category",["Обжарка","Упаковка","Сиропы","Оргтехника","Хозтовары","Химия","Другое"])}</F>
-                <F label="Срочность">{S("urgency",["Обычная","Срочно","Критично"])}</F>
-                <F label="Основание">{I("basis","Обоснование")}</F>
-                <F label="Прикрепить файл (ТЗ, прайс, фото)">
+                <FormField label="Наименование товара">{I("product","Что нужно закупить?")}</FormField>
+                <FormField label="Количество">{I("qty","100 шт")}</FormField>
+                <FormField label="Категория">{S("category",["Обжарка","Упаковка","Сиропы","Оргтехника","Хозтовары","Химия","Другое"])}</FormField>
+                <FormField label="Срочность">{S("urgency",["Обычная","Срочно","Критично"])}</FormField>
+                <FormField label="Основание">{I("basis","Обоснование")}</FormField>
+                <FormField label="Прикрепить файл (ТЗ, прайс, фото)">
                   <div style={{ border:'1.5px dashed #cbd5e1', borderRadius:12, padding:'12px 14px', background:'#f8fafc', display:'flex', alignItems:'center', gap:10 }}>
                     <input type="file" id="req-file" style={{ display:'none' }}
                       onChange={e => set('fileName', e.target.files?.[0]?.name || '')} />
@@ -189,11 +246,11 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
                       {form.fileName || 'Файл не выбран'}
                     </span>
                   </div>
-                </F>
+                </FormField>
               </>}
-              {step===4&&<><F label="Срок поставки">{I("deliveryDate","","date")}</F><F label="Адрес доставки">{I("address","г. Астана, ул. …")}</F><F label="Контакты получателя">{I("contact","+7 701 …")}</F></>}
-              {step===5&&<><F label="Компания поставщика">{I("supplierCompany","Название")}</F><F label="Контактное лицо">{I("supplierPerson","Имя")}</F><F label="Телефон">{I("supplierPhone","+7 …")}</F></>}
-              {step===6&&<div className="space-y-3"><div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">{[["Товар",form.product],["Кол-во",form.qty],["Срочность",form.urgency],["Подразделение",form.dept],["Юр. лицо",form.legalEntity],["Поставщик",form.supplierCompany]].filter(([,v])=>v).map(([l,v])=><div key={l} className="flex justify-between"><span className="text-gray-500">{l}</span><span className="font-medium text-gray-800">{v}</span></div>)}</div><F label="Комментарий"><textarea value={form.comment} onChange={e=>setForm({...form,comment:e.target.value})} rows={3} className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none resize-none" placeholder="Дополнительные детали…"/></F></div>}
+              {step===4&&<><FormField label="Срок поставки">{I("deliveryDate","","date")}</FormField><FormField label="Адрес доставки">{I("address","г. Астана, ул. …")}</FormField><FormField label="Контакты получателя">{I("contact","+7 701 …")}</FormField></>}
+              {step===5&&<><FormField label="Компания поставщика">{I("supplierCompany","Название")}</FormField><FormField label="Контактное лицо">{I("supplierPerson","Имя")}</FormField><FormField label="Телефон">{I("supplierPhone","+7 …")}</FormField></>}
+              {step===6&&<div className="space-y-3"><div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">{[["Товар",form.product],["Кол-во",form.qty],["Срочность",form.urgency],["Подразделение",form.dept],["Юр. лицо",form.legalEntity],["Поставщик",form.supplierCompany]].filter(([,v])=>v).map(([l,v])=><div key={l} className="flex justify-between"><span className="text-gray-500">{l}</span><span className="font-medium text-gray-800">{v}</span></div>)}</div><FormField label="Комментарий"><textarea value={form.comment} onChange={e=>setForm({...form,comment:e.target.value})} rows={3} className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none resize-none" placeholder="Дополнительные детали…"/></FormField></div>}
             </div>
             <div className="p-5 border-t border-gray-100 flex gap-3">
               {step>1&&<button onClick={()=>setStep(s=>s-1)} className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium">Назад</button>}
@@ -215,7 +272,7 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
           </tr></thead>
           <tbody>
             {filtered.map(r=>(
-              <tr key={r.id} onClick={()=>setSel(r)} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer">
+              <tr key={r.id} onClick={()=>setSelId(r.id)} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer">
                 <td className="px-4 py-3 font-semibold text-gray-700">{r.id}</td>
                 <td className="px-4 py-3 text-gray-800">{r.employee}</td>
                 <td className="px-4 py-3 text-gray-500 text-xs">{r.category}</td>
@@ -228,12 +285,10 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
                   <td className="px-4 py-3" onClick={e=>e.stopPropagation()}>
                     {r.status==="Ожидает"
                       ? <div className="flex gap-1.5">
-                          <button onClick={()=>approve(r.id)} className="px-3 py-1 text-white rounded-lg text-xs font-medium hover:opacity-90" style={{background:BRAND}}>Одобрить</button>
-                          <button onClick={()=>reject(r.id)}  className="px-3 py-1 bg-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-300">Откл.</button>
+                          <button onClick={()=>approve(r)} className="px-3 py-1 text-white rounded-lg text-xs font-medium hover:opacity-90" style={{background:BRAND}}>Одобрить</button>
+                          <button onClick={()=>openRejectModal(r)} className="px-3 py-1 bg-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-300">Откл.</button>
                         </div>
-                      : r.status==="Одобрена"
-                        ? <button onClick={()=>onCreateLogisticsOrder?.(r)} className="text-xs font-medium hover:underline" style={{color:BRAND}}>Создать заказ →</button>
-                        : <span className="text-xs text-gray-400">—</span>}
+                      : <span className="text-xs text-gray-400">—</span>}
                   </td>
                 )}
               </tr>
@@ -247,7 +302,7 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
         {filtered.map(r => (
           <motion.div key={r.id}
             initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:0.18}}
-            onClick={() => setSel(r)}
+            onClick={() => setSelId(r.id)}
             className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 cursor-pointer active:scale-[0.98] transition-transform">
             <div className="flex items-start justify-between mb-2">
               <div>
@@ -265,8 +320,8 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
             </div>
             {isManager && r.status==="Ожидает" && (
               <div className="flex gap-2 pt-2 border-t border-gray-50" onClick={e=>e.stopPropagation()}>
-                <button onClick={()=>approve(r.id)} className="flex-1 py-2 text-white rounded-xl text-xs font-semibold" style={{background:BRAND}}>Одобрить</button>
-                <button onClick={()=>reject(r.id)}  className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-medium">Отклонить</button>
+                <button onClick={()=>approve(r)} className="flex-1 py-2 text-white rounded-xl text-xs font-semibold" style={{background:BRAND}}>✓ Одобрить</button>
+                <button onClick={()=>openRejectModal(r)} className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-medium">✕ Откл.</button>
               </div>
             )}
           </motion.div>
@@ -276,6 +331,50 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
         )}
       </div>
       <div className="h-16 lg:hidden" />
+
+      {/* Reject modal */}
+      <AnimatePresence>
+        {rejectModal && (
+          <motion.div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+            initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+            style={{background:'rgba(0,0,0,0.5)'}} onClick={() => setRejectModal(null)}>
+            <motion.div initial={{y:40,opacity:0}} animate={{y:0,opacity:1}} exit={{y:40,opacity:0}}
+              transition={{type:'spring',stiffness:380,damping:38}}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              onClick={e => e.stopPropagation()}>
+              <div className="p-5 border-b border-gray-100">
+                <div className="text-base font-bold text-gray-900 mb-0.5">Отклонить заявку</div>
+                <div className="text-sm text-gray-500">{rejectModal.product}</div>
+              </div>
+              <div className="p-5 space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 block mb-1.5 uppercase tracking-wide">Причина отказа</label>
+                  <textarea
+                    value={rejectReason}
+                    onChange={e => setRejectReason(e.target.value)}
+                    rows={3}
+                    placeholder="Укажите причину отклонения заявки…"
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none resize-none focus:ring-2"
+                    style={{'--tw-ring-color':'#ef4444'}}
+                    autoFocus
+                  />
+                  <div className="text-xs text-gray-400 mt-1">Сотруднику придёт уведомление в Telegram</div>
+                </div>
+              </div>
+              <div className="p-5 pt-0 flex gap-3">
+                <button onClick={() => setRejectModal(null)}
+                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200">
+                  Отмена
+                </button>
+                <button onClick={confirmReject}
+                  className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700">
+                  Отклонить и уведомить
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

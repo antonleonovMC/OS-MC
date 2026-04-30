@@ -106,21 +106,27 @@ export default function Auth({ onLogin }) {
       last_name:  tgUser.last_name  || '',
       status: 'Ожидает', role: '',
     });
-    const cbBase = `${tgUser.id}|${tgUser.username||''}|${tgUser.first_name||''}|${tgUser.last_name||''}`;
+    // Telegram callback_data ограничен 64 байтами — поэтому в callback'е
+    // храним только tg_id, остальное Apps Script достаёт из листа "Запросы"
+    const cbId = String(tgUser.id);
     await notifyTelegram(
       ADMIN_TG_ID,
       `🔐 Запрос на доступ\n\n👤 ${fullName}\n${username}\nID: ${tgUser.id}\n\nВыберите роль или отклоните:`,
       { inline_keyboard: [
         [
-          { text: '👁 Читатель',    callback_data: `grant|reader|${cbBase}` },
-          { text: '📦 Завскладом',  callback_data: `grant|warehouse|${cbBase}` },
+          { text: '👁 Читатель',         callback_data: `g|reader|${cbId}` },
+          { text: '📦 Завскладом',       callback_data: `g|warehouse|${cbId}` },
         ],
         [
-          { text: '🏢 Директор ТК', callback_data: `grant|director_tk|${cbBase}` },
-          { text: '⚙️ Админ',       callback_data: `grant|admin|${cbBase}` },
+          { text: '💼 Менеджер продаж',  callback_data: `g|sales_manager|${cbId}` },
+          { text: '🔥 Обжарщик',         callback_data: `g|roaster|${cbId}` },
         ],
         [
-          { text: '❌ Отклонить',   callback_data: `deny|${cbBase}` },
+          { text: '🏢 Директор ТК',      callback_data: `g|director_tk|${cbId}` },
+          { text: '⚙️ Админ',            callback_data: `g|admin|${cbId}` },
+        ],
+        [
+          { text: '❌ Отклонить',        callback_data: `d|${cbId}` },
         ],
       ]},
     );

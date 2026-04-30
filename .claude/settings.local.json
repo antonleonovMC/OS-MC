@@ -13,7 +13,14 @@
       "Bash(grep -v \"^--$\")",
       "WebFetch(domain:ibb.co)",
       "Bash(npx vite *)",
-      "WebFetch(domain:i.ibb.co)"
+      "WebFetch(domain:i.ibb.co)",
+      "Bash(curl *)",
+      "Bash(git push *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(npx tsc *)",
+      "Bash(npx vercel *)",
+      "Bash(npm list *)"
     ]
   }
 }

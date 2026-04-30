@@ -10,7 +10,8 @@ export default async function handler(req, res) {
   const { chat_id, text, reply_markup } = req.body;
   if (!chat_id || !text) return res.status(400).json({ error: 'missing fields' });
 
-  const body = { chat_id, text };
+  const { parse_mode } = req.body;
+  const body = { chat_id, text, parse_mode: parse_mode || 'HTML' };
   if (reply_markup) body.reply_markup = reply_markup;
 
   const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {

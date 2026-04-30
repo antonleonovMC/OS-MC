@@ -1,15 +1,73 @@
 import { useState, useMemo } from 'react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { TrendingUp, TrendingDown, Package, ClipboardList, Coffee, Truck } from 'lucide-react';
-import { SALES, PRODUCT_GROUPS, DASHBOARD_CITIES } from '../data/constants';
+import { SALES } from '../data/constants';
 import { useData } from '../context/DataContext';
 
 const BRAND    = '#28798d';
 const BRAND_LT = '#e8f4f6';
-const TODAY    = "2026-04-28";
-const M_START  = "2026-04-01";
+const TODAY    = new Date().toISOString().slice(0,10);
+const M_START  = TODAY.slice(0,7) + '-01';
 
-const SALES_PREV = SALES.map(s => ({ ...s, sold: Math.round(s.sold * (0.78 + Math.random() * 0.28)) }));
+// ── Фильтры дашборда — вынесены на уровень модуля, чтобы React не
+//    пересоздавал тип компонента при каждом рендере (иначе клавиатура
+//    закрывается после 1 символа — classic inline-component bug)
+function Filters({ from, to, setFrom, setTo, city, setCity, group, setGroup, cities, groups }) {
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      {/* Период */}
+      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+        <span style={{ fontSize:11, color:'#94a3b8', width:52, flexShrink:0 }}>Период</span>
+        <div style={{ display:'flex', alignItems:'center', gap:6, flex:1 }}>
+          <input type="date" value={from} onChange={e=>setFrom(e.target.value)}
+            style={{ flex:1, minWidth:0, padding:'6px 10px', background:'#f4f8f9', border:'1px solid #d0eaee',
+              borderRadius:10, fontSize:11, outline:'none', color:'#1a3a42' }}/>
+          <span style={{ color:'#cbd5e1', fontSize:11 }}>—</span>
+          <input type="date" value={to} onChange={e=>setTo(e.target.value)}
+            style={{ flex:1, minWidth:0, padding:'6px 10px', background:'#f4f8f9', border:'1px solid #d0eaee',
+              borderRadius:10, fontSize:11, outline:'none', color:'#1a3a42' }}/>
+        </div>
+      </div>
+      {/* Город */}
+      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+        <span style={{ fontSize:11, color:'#94a3b8', width:52, flexShrink:0 }}>Город</span>
+        <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+          {["Все",...cities].map(c=>(
+            <button key={c} onClick={()=>setCity(c)}
+              style={{ padding:'4px 12px', borderRadius:20, fontSize:11, fontWeight:500, border:'none',
+                background: city===c ? BRAND : '#f0f9fa',
+                color: city===c ? 'white' : '#28798d', cursor:'pointer', transition:'all .15s' }}>
+              {c}
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* Группа */}
+      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+        <span style={{ fontSize:11, color:'#94a3b8', width:52, flexShrink:0 }}>Группа</span>
+        <select value={group} onChange={e=>setGroup(e.target.value)}
+          style={{ flex:1, padding:'6px 10px', background:'#f4f8f9', border:'1px solid #d0eaee',
+            borderRadius:10, fontSize:11, outline:'none', color:'#1a3a42', cursor:'pointer' }}>
+          <option value="Все">Все группы</option>
+          {groups.map(g=><option key={g} value={g}>{g}</option>)}
+        </select>
+      </div>
+    </div>
+  );
+}
+
+// "DD.MM.YYYY" или "DD.MM.YY" → "YYYY-MM-DD" для сравнения
+function toISO(d) {
+  if (!d) return '';
+  const s = String(d).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const p = s.split('.');
+  if (p.length === 3) {
+    const y = p[2].length === 2 ? '20' + p[2] : p[2];
+    return `${y}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+  }
+  return s;
+}
 
 const TREND = [
   { d:"01", c:420, p:380 }, { d:"05", c:510, p:430 }, { d:"09", c:480, p:460 },
@@ -71,23 +129,36 @@ export default function Dashboard({ setPage }) {
   const [tab,   setTab]   = useState("trend");
   const [open,  setOpen]  = useState(false); // mobile filter toggle
 
-  const rows = useMemo(() => SALES.filter(s =>
+  const { orders, requests, coffees, settings, dashData } = useData();
+  const DASHBOARD_CITIES = settings.cities;
+  const PRODUCT_GROUPS   = settings.groups;
+
+  // Если есть данные из Sheets — используем их, иначе seed-данные
+  const SOURCE = useMemo(() => {
+    if (dashData.length > 0) {
+      return dashData.map(r => ({
+        product:       String(r.product_name || ''),
+        group:         String(r.product_group || ''),
+        sold:          Number(r.sales_total)  || 0,
+        stock:         Number(r.stock)        || 0,
+        city:          String(r.city || ''),
+        dateISO:       toISO(r.date_start),
+        dateISOEnd:    toISO(r.date_end),
+        sales_per_day: Number(r.sales_per_day) || 0,
+      }));
+    }
+    return SALES.map(s => ({ ...s, dateISO: s.date, dateISOEnd: s.date }));
+  }, [dashData]);
+
+  const rows = useMemo(() => SOURCE.filter(s =>
     (city==="Все"||s.city===city) &&
     (group==="Все"||s.group===group) &&
-    s.date>=from && s.date<=to
-  ), [city,group,from,to]);
+    s.dateISO <= to && (s.dateISOEnd >= from || s.dateISO >= from)
+  ), [city, group, from, to, SOURCE]);
 
-  const rowsPrev = useMemo(() => SALES_PREV.filter(s =>
-    (city==="Все"||s.city===city) &&
-    (group==="Все"||s.group===group)
-  ), [city,group]);
-
-  const sold     = rows.reduce((a,s)=>a+s.sold, 0);
-  const soldPrev = rowsPrev.reduce((a,s)=>a+s.sold, 0);
-  const stock    = rows.reduce((a,s)=>a+s.stock, 0);
-  const delta    = soldPrev>0 ? Math.round((sold-soldPrev)/soldPrev*100) : 0;
-
-  const { orders, requests, coffees } = useData();
+  const sold  = rows.reduce((a,s)=>a+s.sold, 0);
+  const stock = rows.reduce((a,s)=>a+s.stock, 0);
+  const delta = 0; // без данных за прошлый период из таблицы
   const active = orders.filter(o=>!["Архив","Доставлен"].includes(o.status));
   const pReqs  = requests.filter(r=>r.status==="Ожидает");
   const pCoff  = coffees.filter(o=>o.status!=="Получен");
@@ -102,49 +173,8 @@ export default function Dashboard({ setPage }) {
   },[rows]);
 
   const BAR = ['#28798d','#3a9db5','#5bbdd4','#82cfe0','#1d5f70','#0f3d4a'];
-
-  // Filters block — used in both mobile (collapsible) and desktop (inside chart card)
-  const Filters = () => (
-    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-      {/* Period */}
-      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-        <span style={{ fontSize:11, color:'#94a3b8', width:52, flexShrink:0 }}>Период</span>
-        <div style={{ display:'flex', alignItems:'center', gap:6, flex:1 }}>
-          <input type="date" value={from} onChange={e=>setFrom(e.target.value)}
-            style={{ flex:1, minWidth:0, padding:'6px 10px', background:'#f4f8f9', border:'1px solid #d0eaee',
-              borderRadius:10, fontSize:11, outline:'none', color:'#1a3a42' }}/>
-          <span style={{ color:'#cbd5e1', fontSize:11 }}>—</span>
-          <input type="date" value={to} onChange={e=>setTo(e.target.value)}
-            style={{ flex:1, minWidth:0, padding:'6px 10px', background:'#f4f8f9', border:'1px solid #d0eaee',
-              borderRadius:10, fontSize:11, outline:'none', color:'#1a3a42' }}/>
-        </div>
-      </div>
-      {/* City */}
-      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-        <span style={{ fontSize:11, color:'#94a3b8', width:52, flexShrink:0 }}>Город</span>
-        <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-          {["Все",...DASHBOARD_CITIES].map(c=>(
-            <button key={c} onClick={()=>setCity(c)}
-              style={{ padding:'4px 12px', borderRadius:20, fontSize:11, fontWeight:500, border:'none',
-                background: city===c ? BRAND : '#f0f9fa',
-                color: city===c ? 'white' : '#28798d', cursor:'pointer', transition:'all .15s' }}>
-              {c}
-            </button>
-          ))}
-        </div>
-      </div>
-      {/* Group */}
-      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-        <span style={{ fontSize:11, color:'#94a3b8', width:52, flexShrink:0 }}>Группа</span>
-        <select value={group} onChange={e=>setGroup(e.target.value)}
-          style={{ flex:1, padding:'6px 10px', background:'#f4f8f9', border:'1px solid #d0eaee',
-            borderRadius:10, fontSize:11, outline:'none', color:'#1a3a42', cursor:'pointer' }}>
-          <option value="Все">Все группы</option>
-          {PRODUCT_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
-        </select>
-      </div>
-    </div>
-  );
+  const filtersProps = { from, to, setFrom, setTo, city, setCity, group, setGroup,
+    cities: DASHBOARD_CITIES, groups: PRODUCT_GROUPS };
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
@@ -191,13 +221,13 @@ export default function Dashboard({ setPage }) {
 
         {/* Desktop filters always visible */}
         <div className="hidden lg:block" style={{ padding:'12px 18px 0' }}>
-          <Filters />
+          <Filters {...filtersProps} />
         </div>
 
         {/* Mobile filters collapsible */}
         {open && (
           <div className="lg:hidden" style={{ padding:'12px 18px 0' }}>
-            <Filters />
+            <Filters {...filtersProps} />
           </div>
         )}
 
@@ -323,34 +353,6 @@ export default function Dashboard({ setPage }) {
             <div style={{ fontSize:13, fontWeight:700, color:'#1a3a42' }}>{n.label}</div>
             <div style={{ fontSize:10, color:'#94a3b8', marginTop:2 }}>{n.sub}</div>
           </button>
-        ))}
-      </div>
-
-      {/* ── События ── */}
-      <div style={{ background:'white', borderRadius:20, border:'1px solid #e8f4f6',
-        boxShadow:'0 2px 12px rgba(40,121,141,0.07)', overflow:'hidden' }}>
-        <div style={{ padding:'14px 18px 10px', fontSize:13, fontWeight:700, color:'#1a3a42' }}>События</div>
-        {[
-          { bg:'#ecfdf5', dot:'#059669', icon:'✅', text:'Упаковка DripBag доставлена',     sub:'PackBox → С341/6',         time:'10:24' },
-          { bg:'#eff6ff', dot:'#3b82f6', icon:'📦', text:'Заявка на этикетки одобрена',     sub:'Этикетки Prestige · Антон', time:'09:40' },
-          { bg:'#fff7ed', dot:'#f97316', icon:'🆕', text:'Новая заявка: Мешки 120л',        sub:'Обжарка · Болат',           time:'09:15' },
-          { bg:'#f5f3ff', dot:'#8b5cf6', icon:'🚚', text:'Кофемашины Dr.Coffee → В пути',  sub:'Green Origins',             time:'08:50' },
-          { bg:'#fff7ed', dot:'#f97316', icon:'☕', text:'Заказ на обжарку Эспрессо Бленд',sub:'Астана · 400кг',            time:'Вчера' },
-        ].map((ev,i)=>(
-          <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 18px',
-            borderTop: i===0 ? 'none' : '1px solid #f8fafc', transition:'background .12s', cursor:'default' }}
-            onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'}
-            onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-            <div style={{ width:32, height:32, borderRadius:10, background:ev.bg,
-              display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, flexShrink:0 }}>
-              {ev.icon}
-            </div>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:12, fontWeight:600, color:'#1a3a42', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{ev.text}</div>
-              <div style={{ fontSize:10, color:'#94a3b8', marginTop:1 }}>{ev.sub}</div>
-            </div>
-            <span style={{ fontSize:10, color:'#cbd5e1', flexShrink:0, fontVariantNumeric:'tabular-nums' }}>{ev.time}</span>
-          </div>
         ))}
       </div>
 
