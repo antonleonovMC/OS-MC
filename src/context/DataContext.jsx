@@ -202,6 +202,12 @@ export function DataProvider({ children, onReady }) {
     }
   }, [subscriptions]);
 
+  // ── STAFF ───────────────────────────────────────────────────────────────
+  const updateStaffMember = useCallback((id, patch) => {
+    setStaff(p => p.map(s => String(s.id) === String(id) ? { ...s, ...patch } : s));
+    updateRow('Сотрудники', id, patch);
+  }, []);
+
   // ── REQUESTS ────────────────────────────────────────────────────────────
   const addRequest = useCallback((req) => {
     setRequests(p => [req, ...p]);
@@ -279,6 +285,7 @@ export function DataProvider({ children, onReady }) {
       // typed mutations (also sync to Sheets)
       addOrder, updateOrderStatus, updateOrder, toggleSubscription,
       addRequest, updateRequestStatus,
+      updateStaffMember,
       addInvoice, updateInvoice,
       addCoffeeOrder, updateCoffeeOrder,
       addTask, updateTask, moveTask,

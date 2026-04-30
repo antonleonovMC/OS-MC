@@ -11,6 +11,7 @@ export default function Sidebar({ user, page, setPage, onLogout }) {
     { id:"coffee",    label:"Заказ КОФЕЕЕЕЕ",  icon:"☕", group:"Операции"   },
     { id:"payments",  label:"Оплата",          icon:"💳", group:"Финансы"    },
     { id:"tasks",     label:"Задачи отдела",   icon:"✓",  group:"Управление" },
+    { id:"staff",     label:"Сотрудники",      icon:"👥", group:"Управление" },
     { id:"feedback",  label:"Обратная связь",  icon:"💬", group:"Прочее"     },
   ].filter(i => access.includes(i.id));
 

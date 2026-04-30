@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Toaster } from 'sonner';
-import { ROLE_ACCESS, genCode, advanceHistory } from './data/constants';
+import { ROLE_ACCESS, ROLE_LABELS, genCode, advanceHistory } from './data/constants';
 import { DataProvider, useData } from './context/DataContext';
 
 import Auth       from './pages/Auth';
@@ -13,6 +13,7 @@ import Payments   from './pages/Payments';
 import Coffee     from './pages/Coffee';
 import Tasks      from './pages/Tasks';
 import Feedback   from './pages/Feedback';
+import Staff      from './pages/Staff';
 import Sidebar    from './components/Sidebar';
 import BottomNav  from './components/BottomNav';
 import Avatar     from './components/Avatar';
@@ -27,10 +28,11 @@ const PAGE_META = {
   coffee:    { title:'Заказ КОФЕЕЕЕЕ'  },
   payments:  { title:'Оплата'          },
   tasks:     { title:'Задачи'          },
+  staff:     { title:'Сотрудники'      },
   feedback:  { title:'Обратная связь'  },
 };
 
-const PAGE_ORDER = ['dashboard','logistics','requests','coffee','payments','tasks','feedback'];
+const PAGE_ORDER = ['dashboard','logistics','requests','coffee','payments','tasks','staff','feedback'];
 
 // Десктоп: вертикальный fade. Мобильный: горизонтальный слайд
 const makeVariants = (dir) => {
@@ -89,11 +91,17 @@ function Inner() {
   const [page, setPage]               = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [navDir, setNavDir]           = useState(1);
+  // Админ может временно смотреть приложение глазами другой роли (для проверки прав)
+  const [viewAsRole, setViewAsRole]   = useState(null);
+  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const { orders, addOrder } = useData();
 
   if (!user) return <Auth onLogin={u => { setUser(u); setPage('dashboard'); }} />;
 
-  const access   = ROLE_ACCESS[user.role];
+  const isRealAdmin   = user.role === 'admin';
+  const effectiveRole = isRealAdmin && viewAsRole ? viewAsRole : user.role;
+  const effectiveUser = effectiveRole === user.role ? user : { ...user, role: effectiveRole };
+  const access   = ROLE_ACCESS[effectiveRole] || [];
   const meta     = PAGE_META[page] || PAGE_META.dashboard;
   const safePage = p => {
     if (access.includes(p)) {
@@ -133,8 +141,8 @@ function Inner() {
 
       {/* Desktop sidebar */}
       <div className="hidden lg:block">
-        <Sidebar user={user} page={page} setPage={safePage}
-          onLogout={() => { setUser(null); setPage('dashboard'); }} />
+        <Sidebar user={effectiveUser} page={page} setPage={safePage}
+          onLogout={() => { setUser(null); setViewAsRole(null); setPage('dashboard'); }} />
       </div>
 
       {/* Mobile drawer */}
@@ -147,8 +155,8 @@ function Inner() {
             <motion.div className="relative z-50 w-64"
               initial={{ x:-260 }} animate={{ x:0 }} exit={{ x:-260 }}
               transition={{ type:'spring', stiffness:340, damping:34 }}>
-              <Sidebar user={user} page={page} setPage={safePage}
-                onLogout={() => { setUser(null); setPage('dashboard'); }} />
+              <Sidebar user={effectiveUser} page={page} setPage={safePage}
+                onLogout={() => { setUser(null); setViewAsRole(null); setPage('dashboard'); }} />
             </motion.div>
           </motion.div>
         )}
@@ -170,6 +178,62 @@ function Inner() {
             <span className="text-sm font-semibold" style={{ color:'#1a3a42' }}>{meta.title}</span>
           </div>
           <div className="flex items-center gap-2">
+            {/* Admin: переключатель «Смотрю как…» */}
+            {isRealAdmin && (
+              <div className="relative">
+                <button onClick={() => setRoleMenuOpen(v => !v)}
+                  className="flex items-center gap-1.5 px-2.5 h-7 rounded-xl text-xs font-semibold transition-colors"
+                  style={{
+                    background: viewAsRole ? '#fef3c7' : '#e8f4f6',
+                    color:      viewAsRole ? '#92400e' : BRAND,
+                    border: '1px solid ' + (viewAsRole ? '#fcd34d' : 'transparent'),
+                  }}
+                  title="Просмотр от имени другой роли">
+                  <span style={{ fontSize:12 }}>👁</span>
+                  <span className="hidden sm:inline">{viewAsRole ? ROLE_LABELS[viewAsRole] : 'Роль'}</span>
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                    <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <AnimatePresence>
+                  {roleMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-30" onClick={() => setRoleMenuOpen(false)} />
+                      <motion.div
+                        initial={{ opacity:0, y:-6 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-6 }}
+                        transition={{ duration:0.15 }}
+                        className="absolute right-0 top-full mt-1 z-40 bg-white rounded-xl border border-gray-100 overflow-hidden"
+                        style={{ minWidth:200, boxShadow:'0 8px 28px rgba(0,0,0,0.12)' }}>
+                        <div className="px-3 py-2 border-b border-gray-50 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                          Смотреть как
+                        </div>
+                        <button onClick={() => { setViewAsRole(null); setRoleMenuOpen(false); }}
+                          className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center justify-between"
+                          style={{ color: !viewAsRole ? BRAND : '#374151', fontWeight: !viewAsRole ? 700 : 500 }}>
+                          <span>⚙️ Себя (Администратор)</span>
+                          {!viewAsRole && <span>✓</span>}
+                        </button>
+                        <div className="border-t border-gray-50" />
+                        {Object.entries(ROLE_LABELS)
+                          .filter(([k]) => k !== 'admin')
+                          .map(([key, label]) => {
+                            const active = viewAsRole === key;
+                            return (
+                              <button key={key}
+                                onClick={() => { setViewAsRole(key); setRoleMenuOpen(false); }}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center justify-between"
+                                style={{ color: active ? BRAND : '#374151', fontWeight: active ? 700 : 500 }}>
+                                <span>{label}</span>
+                                {active && <span>✓</span>}
+                              </button>
+                            );
+                          })}
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
             <button className="w-7 h-7 flex items-center justify-center rounded-xl hover:bg-black/5 relative transition-colors">
               <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
                 <path d="M10 2a6 6 0 016 6c0 3 1 4 2 5H2c1-1 2-2 2-5a6 6 0 016-6z" stroke="#6b7280" strokeWidth="1.5"/>
@@ -185,6 +249,22 @@ function Inner() {
           </div>
         </header>
 
+        {/* Баннер режима «Смотрю как…» — только для админа в импер-режиме */}
+        {isRealAdmin && viewAsRole && (
+          <div style={{ background:'#fef3c7', borderBottom:'1px solid #fcd34d', padding:'8px 16px',
+            display:'flex', alignItems:'center', gap:10 }}>
+            <span style={{ fontSize:14 }}>👁</span>
+            <span style={{ fontSize:12, color:'#92400e', flex:1 }}>
+              Смотрите как <b>{ROLE_LABELS[viewAsRole]}</b> · действия и доступы ограничены этой ролью
+            </span>
+            <button onClick={() => setViewAsRole(null)}
+              style={{ fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8,
+                background:'#92400e', color:'white', border:'none', cursor:'pointer' }}>
+              Вернуться
+            </button>
+          </div>
+        )}
+
         <main className="flex-1 px-3 sm:px-4 lg:px-6 overflow-auto lg:pb-6 pb-24" style={{ paddingTop:8 }}>
           {!access.includes(page) ? (
             <div className="flex items-center justify-center h-64 flex-col gap-3">
@@ -196,12 +276,13 @@ function Inner() {
             <AnimatePresence mode="wait">
               <motion.div key={page} {...makeVariants(navDir)} style={{ overflow: 'hidden' }}>
                 {page === 'dashboard' && <Dashboard setPage={safePage} />}
-                {page === 'logistics' && <Logistics user={user} />}
-                {page === 'requests'  && <Requests  user={user} sidebarOpen={sidebarOpen} onCreateLogisticsOrder={handleCreateLogisticsOrder} />}
-                {page === 'coffee'    && <Coffee    user={user} />}
-                {page === 'payments'  && <Payments user={user} />}
-                {page === 'tasks'     && <Tasks     user={user} />}
-                {page === 'feedback'  && <Feedback  user={user} />}
+                {page === 'logistics' && <Logistics user={effectiveUser} />}
+                {page === 'requests'  && <Requests  user={effectiveUser} sidebarOpen={sidebarOpen} onCreateLogisticsOrder={handleCreateLogisticsOrder} />}
+                {page === 'coffee'    && <Coffee    user={effectiveUser} />}
+                {page === 'payments'  && <Payments  user={effectiveUser} />}
+                {page === 'tasks'     && <Tasks     user={effectiveUser} />}
+                {page === 'staff'     && <Staff />}
+                {page === 'feedback'  && <Feedback  user={effectiveUser} />}
               </motion.div>
             </AnimatePresence>
           )}
@@ -209,7 +290,7 @@ function Inner() {
       </div>
 
       <div className="lg:hidden">
-        <BottomNav user={user} page={page} setPage={safePage} />
+        <BottomNav user={effectiveUser} page={page} setPage={safePage} />
       </div>
     </div>
   );

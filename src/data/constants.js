@@ -24,7 +24,7 @@ export const ROLE_LABELS = {
 };
 
 export const ROLE_ACCESS = {
-  admin:         ["dashboard","logistics","requests","tasks","coffee","payments","feedback"],
+  admin:         ["dashboard","logistics","requests","tasks","coffee","payments","feedback","staff"],
   director_tk:   ["dashboard","logistics","requests","coffee","feedback"],
   warehouse:     ["dashboard","logistics","requests","coffee","feedback"],
   sales_manager: ["dashboard","logistics","requests","coffee","feedback"],
