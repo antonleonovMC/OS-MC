@@ -131,8 +131,9 @@ export default async function handler(req, res) {
         const userData = await fetchUserRequest(tgId);
         const firstName = userData?.first_name || '';
         const lastName  = userData?.last_name  || '';
-        const username  = userData?.username   || '';
-        const fullName  = [firstName, lastName].filter(Boolean).join(' ') || username || 'Сотрудник';
+        const rawUsername = userData?.username || '';
+        const username  = rawUsername.replace(/^@/, '');
+        const fullName  = [firstName, lastName].filter(Boolean).join(' ') || (username ? '@' + username : '') || 'Сотрудник';
         const roleLabel = ROLE_LABELS[role] || role;
         const color     = COLORS[numId % COLORS.length];
         const av        = initials(firstName, lastName);

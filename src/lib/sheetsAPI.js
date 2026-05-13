@@ -57,7 +57,8 @@ export async function sendAccessRequest(data) {
   if (!BASE) return;
   return fetch(BASE, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ action: 'append', sheet: 'Запросы', data }),
   }).catch(() => {});
 }
