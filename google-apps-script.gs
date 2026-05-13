@@ -44,6 +44,7 @@ function setupSheets() {
     'Подписки': [
       'id','tg_id','order_id','order_title'
     ],
+    'Подписки на заявки': ['tg_id'],
     'Заявки на оплату': [
       'id','requester','legal_entity','recipient','amount','currency',
       'category','due_date','purpose','comment','status',
@@ -201,6 +202,26 @@ function doGet(e) {
 const BOT_TOKEN = PropertiesService.getScriptProperties().getProperty('BOT_TOKEN')
   || '8740508950:AAGddYGgY1DSC93wPIt_lG0kx2PGAYHAK3o';
 const APP_URL   = 'https://os-mc.vercel.app';
+
+// Запусти один раз: выбери setupWebhook → нажми ▶ Выполнить
+function setupWebhook() {
+  const webhookUrl = ScriptApp.getService().getUrl();
+  const response = UrlFetchApp.fetch(
+    'https://api.telegram.org/bot' + BOT_TOKEN + '/setWebhook',
+    {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ url: webhookUrl }),
+      muteHttpExceptions: true,
+    }
+  );
+  const result = JSON.parse(response.getContentText());
+  Logger.log('setWebhook: ' + JSON.stringify(result));
+  SpreadsheetApp.getUi().alert(result.ok
+    ? '✅ Вебхук установлен!\n' + webhookUrl
+    : '❌ Ошибка: ' + result.description
+  );
+}
 
 function sendTg(chatId, text, replyMarkup, parseMode) {
   const payload = {
@@ -453,6 +474,70 @@ function doPost(e) {
     // ── Sheets API ────────────────────────────────────────────────
     const { action, sheet: sheetName, id, data } = body;
 
+    // ── Notify-действия не требуют sheetName — обрабатываем первыми ──
+    if (action === 'notify_direct') {
+      const { tg_id, message } = data;
+      if (tg_id) sendTg(Number(tg_id), message);
+      return json({ ok: true, action: 'notify_direct' });
+    }
+
+    if (action === 'notify_requests') {
+      const ALWAYS_NOTIFY = [799893273, 1433619908];
+      const { employee, category, product, urgency, dept } = data;
+
+      const urgencyIcon = { 'Критично': '🔴', 'Срочно': '🟡', 'Обычная': '🟢' }[urgency] || '⚪';
+      const msg =
+        '📋 <b>Новая заявка на закуп</b>\n\n' +
+        '👤 Сотрудник: ' + (employee || '—') + '\n' +
+        '🏢 Подразделение: ' + (dept || '—') + '\n' +
+        '📦 Категория: ' + (category || '—') + '\n' +
+        '🛒 Товар: ' + (product || '—') + '\n' +
+        urgencyIcon + ' Срочность: ' + (urgency || '—');
+
+      let sent = 0;
+      const notified = new Set();
+      ALWAYS_NOTIFY.forEach(function(id) { sendTg(id, msg); notified.add(id); sent++; });
+
+      const subsSheet = SS.getSheetByName('Подписки на заявки');
+      if (subsSheet) {
+        const subsData = subsSheet.getDataRange().getValues();
+        const tgIdCol  = subsData[0].indexOf('tg_id');
+        if (tgIdCol >= 0) {
+          for (let r = 1; r < subsData.length; r++) {
+            const tgId = Number(subsData[r][tgIdCol]);
+            if (tgId && !notified.has(tgId)) { sendTg(tgId, msg); sent++; }
+          }
+        }
+      }
+      return json({ ok: true, action: 'notify_requests', sent });
+    }
+
+    if (action === 'notify') {
+      const { order_id, order_title, lines } = data;
+      const subsSheet = SS.getSheetByName('Подписки');
+      if (!subsSheet) return json({ ok: true, sent: 0 });
+
+      const subsData    = subsSheet.getDataRange().getValues();
+      const subsHeaders = subsData[0];
+      const orderIdCol  = subsHeaders.indexOf('order_id');
+      const tgIdCol     = subsHeaders.indexOf('tg_id');
+
+      const msg =
+        '🚚 <b>Обновление по заказу</b>\n' +
+        (order_title || '') + '\n\n' +
+        (lines || '') +
+        '\n\nБлагодарю, хорошего дня 🙏';
+
+      let sent = 0;
+      for (let r = 1; r < subsData.length; r++) {
+        if (String(subsData[r][orderIdCol]) === String(order_id)) {
+          const tgId = subsData[r][tgIdCol];
+          if (tgId) { sendTg(tgId, msg); sent++; }
+        }
+      }
+      return json({ ok: true, action: 'notify', sent });
+    }
+
     const sheet = SS.getSheetByName(sheetName);
     if (!sheet) return json({ error: 'Лист не найден: ' + sheetName });
 
@@ -527,6 +612,37 @@ function doPost(e) {
       if (tg_id) sendTg(Number(tg_id), message);
       return json({ ok: true, action: 'notify_direct' });
     }
+
+    if (action === 'notify_requests') {
+  const ALWAYS_NOTIFY = [799893273, 1433619908];
+  const { employee, category, product, urgency, dept } = data;
+
+  const urgencyIcon = { 'Критично': '🔴', 'Срочно': '🟡', 'Обычная': '🟢' }[urgency] || '⚪';
+  const msg =
+    '📋 <b>Новая заявка на закуп</b>\n\n' +
+    '👤 Сотрудник: ' + (employee || '—') + '\n' +
+    '🏢 Подразделение: ' + (dept || '—') + '\n' +
+    '📦 Категория: ' + (category || '—') + '\n' +
+    '🛒 Товар: ' + (product || '—') + '\n' +
+    urgencyIcon + ' Срочность: ' + (urgency || '—');
+
+  let sent = 0;
+  const notified = new Set();
+  ALWAYS_NOTIFY.forEach(function(id) { sendTg(id, msg); notified.add(id); sent++; });
+
+  const subsSheet = SS.getSheetByName('Подписки на заявки');
+  if (subsSheet) {
+    const subsData = subsSheet.getDataRange().getValues();
+    const tgIdCol  = subsData[0].indexOf('tg_id');
+    if (tgIdCol >= 0) {
+      for (let r = 1; r < subsData.length; r++) {
+        const tgId = Number(subsData[r][tgIdCol]);
+        if (tgId && !notified.has(tgId)) { sendTg(tgId, msg); sent++; }
+      }
+    }
+  }
+  return json({ ok: true, action: 'notify_requests', sent });
+}
 
     return json({ error: 'Неизвестный action: ' + action });
 
