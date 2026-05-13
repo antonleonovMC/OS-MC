@@ -85,7 +85,8 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
     addRequest(req);
     fetch(import.meta.env.VITE_SHEETS_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({
         action: 'notify_requests',
         data: {
