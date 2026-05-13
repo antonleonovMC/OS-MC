@@ -6,7 +6,7 @@ import Badge from '../components/Badge';
 
 const BRAND = '#28798d';
 const STEP_LABELS = ["Контакты","Структура","Товар","Логистика","Поставщик","Итого"];
-const EMPTY_FORM = { fullName:"", email:"", dept:"", budgetDept:"", legalEntity:"", product:"", qty:"", basis:"", url:"", deliveryDate:"", address:"", contact:"", supplierCompany:"", supplierPerson:"", supplierPhone:"", comment:"", urgency:"Обычная", category:"", fileName:"" };
+const EMPTY_FORM = { fullName:"", email:"", dept:"", budgetDept:"", legalEntity:"", items:[{ name:'', qty:'' }], basis:"", url:"", deliveryDate:"", address:"", contact:"", supplierCompany:"", supplierPerson:"", supplierPhone:"", comment:"", urgency:"Обычная", category:"", fileName:"", categoryOther:"" };
 
 // Вынесен на уровень модуля — иначе React пересоздаёт тип компонента
 // при каждом keystroke и перемонтирует поля → закрывается клавиатура
@@ -59,9 +59,44 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
     return found?.tg_id || null;
   };
 
+  const canGoNext = () => {
+    if (step === 4) return form.address.trim() !== '' && form.contact.trim() !== '';
+    return true;
+  };
+
   const submit = () => {
-    const req = { id:`REQ-0${reqs.length+24}`, employee:user.name.split(" ").slice(0,2).join(" "), dept:user.dept, category:form.category||"Другое", product:form.product, qty:form.qty, urgency:form.urgency, date:new Date().toLocaleDateString("ru-RU"), status:"Ожидает", comment:form.comment };
+    const validItems = form.items.filter(it => it.name.trim());
+    const productStr = validItems.map(it => `${it.name}: ${it.qty}`).join('; ');
+    const totalQty   = form.items.reduce((s, it) => s + (parseFloat(it.qty) || 0), 0);
+    const req = {
+      id: `REQ-0${reqs.length + 24}`,
+      employee: user.name.split(' ').slice(0, 2).join(' '),
+      dept: user.dept,
+      category: form.category === 'Другое'
+        ? (form.categoryOther || 'Другое')
+        : form.category || 'Другое',
+      product: productStr,
+      qty: totalQty ? String(totalQty) : '',
+      urgency: form.urgency,
+      date: new Date().toLocaleDateString('ru-RU'),
+      status: 'Ожидает',
+      comment: form.comment,
+    };
     addRequest(req);
+    fetch(import.meta.env.VITE_SHEETS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'notify_requests',
+        data: {
+          employee: req.employee,
+          dept: req.dept,
+          category: req.category,
+          product: req.product,
+          urgency: req.urgency,
+        },
+      }),
+    }).catch(() => {});
     setShowForm(false); setStep(1); setForm(EMPTY_FORM);
     toast.success("Заявка отправлена на рассмотрение");
   };
@@ -131,7 +166,6 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
         <div className="p-5 space-y-3 border-b border-gray-100">
           {[
             ["Категория",    sel.category],
-            ["Количество",   sel.qty],
             ["Дата заявки",  sel.date],
             ["Подразделение",sel.dept],
           ].map(([l,v]) => v && (
@@ -146,6 +180,32 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
             </div>
           )}
         </div>
+
+        {/* Товар */}
+        {(() => {
+          const isMulti = sel.product && sel.product.includes(';');
+          const items = isMulti
+            ? sel.product.split(';').map(s => { const [name, qty] = s.split(':'); return { name: (name||'').trim(), qty: (qty||'').trim() }; }).filter(i => i.name)
+            : sel.product ? [{ name: sel.product, qty: sel.qty }] : [];
+          if (!items.length) return null;
+          return (
+            <div className="border-b border-gray-100 px-5 py-4">
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Товар</div>
+              <div className="rounded-xl overflow-hidden border border-gray-100">
+                <div className="grid grid-cols-2 bg-gray-50 px-4 py-2">
+                  <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Наименование</span>
+                  <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide text-right">Кол-во</span>
+                </div>
+                {items.map((it, i) => (
+                  <div key={i} className="grid grid-cols-2 px-4 py-2.5 border-t border-gray-50 hover:bg-gray-50">
+                    <span className="text-sm text-gray-700">{it.name}</span>
+                    <span className="text-sm font-medium text-gray-900 text-right">{it.qty}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Manager actions */}
         {isAdmin && sel.status === "Ожидает" && (
@@ -230,11 +290,69 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
             </div>
             <div className="p-5 space-y-4">
               {step===1&&<><FormField label="ФИО">{I("fullName","Фамилия Имя Отчество")}</FormField><FormField label="Email">{I("email","email@mastercoffee.kz","email")}</FormField></>}
-              {step===2&&<><FormField label="Подразделение">{S("dept",["УК","ТК","Обжарка","Цех","Кофейни"])}</FormField><FormField label="Бюджетное подразделение">{I("budgetDept","Название")}</FormField><FormField label="Юр. лицо">{S("legalEntity",["ТОО Мастер Кофе","ИП Master Coffee Trade","ИП Master Coffee Roasters","ТОО Mastercoffee.kz","Другое"])}</FormField></>}
+              {step===2&&<><FormField label="Подразделение">{S("dept",["УК","ТК","Обжарка","Цех","Кофейни"])}</FormField><FormField label="Бюджетное подразделение">{S("budgetDept",["УК","ТК","Обжарка","Цех","Кофейни"])}</FormField><FormField label="Юр. лицо">{S("legalEntity",["ТОО Мастер Кофе","ИП Master Coffee Trade","ИП Master Coffee Roasters","ТОО Mastercoffee.kz","Другое"])}</FormField></>}
               {step===3&&<>
-                <FormField label="Наименование товара">{I("product","Что нужно закупить?")}</FormField>
-                <FormField label="Количество">{I("qty","100 шт")}</FormField>
-                <FormField label="Категория">{S("category",["Обжарка","Упаковка","Сиропы","Оргтехника","Хозтовары","Химия","Другое"])}</FormField>
+                <FormField label="Категория">
+                  <select value={form.category} onChange={e => { set('category', e.target.value); set('categoryOther', ''); set('items', [{ name:'', qty:'' }]); }} className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2" style={{'--tw-ring-color':BRAND}}>
+                    <option value="">Выберите…</option>
+                    {["Обжарка","Упаковка","Сиропы","Оргтехника","Хозтовары","Химия","Этикетки для кофе","Другое"].map(o=><option key={o}>{o}</option>)}
+                  </select>
+                </FormField>
+                {form.category === 'Другое' && (
+                  <FormField label="Уточните категорию">{I("categoryOther","Введите категорию...")}</FormField>
+                )}
+                {form.category && (() => {
+                  const total = form.items.reduce((s, it) => s + (parseFloat(it.qty) || 0), 0);
+                  const isLabel = form.category === 'Этикетки для кофе';
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                          {isLabel ? 'Этикетки' : 'Товары'}
+                        </label>
+                        {total > 0 && (
+                          <span className="text-xs text-gray-400">Итого: <span className="font-semibold text-gray-700">{total}</span></span>
+                        )}
+                      </div>
+                      <div className="rounded-xl overflow-hidden border border-gray-100">
+                        <div className="grid grid-cols-[1fr_90px_28px] bg-gray-50 px-3 py-2 gap-2">
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Наименование</span>
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Кол-во</span>
+                          <span/>
+                        </div>
+                        {form.items.map((item, idx) => (
+                          <div key={idx} className="grid grid-cols-[1fr_90px_28px] gap-2 px-3 py-2 border-t border-gray-50 items-center">
+                            <input
+                              className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2"
+                              style={{'--tw-ring-color':BRAND}}
+                              placeholder={isLabel ? "Название этикетки" : "Наименование товара"}
+                              value={item.name}
+                              onChange={e => set('items', form.items.map((it,i)=>i===idx?{...it,name:e.target.value}:it))}
+                            />
+                            <input
+                              className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2"
+                              style={{'--tw-ring-color':BRAND}}
+                              placeholder="0"
+                              value={item.qty}
+                              onChange={e => set('items', form.items.map((it,i)=>i===idx?{...it,qty:e.target.value}:it))}
+                            />
+                            <button type="button"
+                              onClick={() => form.items.length > 1 && set('items', form.items.filter((_,i)=>i!==idx))}
+                              className={`flex items-center justify-center w-6 h-6 rounded-full text-sm transition-colors ${form.items.length > 1 ? 'text-red-400 hover:text-red-600 hover:bg-red-50' : 'text-gray-200 cursor-default'}`}>
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button type="button"
+                        onClick={() => set('items', [...form.items, { name:'', qty:'' }])}
+                        className="text-sm font-medium hover:underline"
+                        style={{color:BRAND}}>
+                        + Добавить {isLabel ? 'этикетку' : 'товар'}
+                      </button>
+                    </div>
+                  );
+                })()}
                 <FormField label="Срочность">{S("urgency",["Обычная","Срочно","Критично"])}</FormField>
                 <FormField label="Основание">{I("basis","Обоснование")}</FormField>
                 <FormField label="Прикрепить файл (ТЗ, прайс, фото)">
@@ -250,14 +368,53 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
                   </div>
                 </FormField>
               </>}
-              {step===4&&<><FormField label="Срок поставки">{I("deliveryDate","","date")}</FormField><FormField label="Адрес доставки">{I("address","г. Астана, ул. …")}</FormField><FormField label="Контакты получателя">{I("contact","+7 701 …")}</FormField></>}
+              {step===4&&<>
+                <FormField label="Срок поставки">{I("deliveryDate","","date")}</FormField>
+                <FormField label={<span>Адрес доставки <span className="text-red-500">*</span></span>}>
+                  <input placeholder="г. Астана, ул. …" value={form.address} onChange={e=>set('address',e.target.value)}
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 ${!form.address.trim() ? 'border-red-200 bg-red-50' : 'border-gray-200'}`}
+                    style={{'--tw-ring-color':BRAND}}/>
+                  {!form.address.trim() && <p className="text-xs text-red-500 mt-1">Обязательное поле</p>}
+                </FormField>
+                <FormField label={<span>Контакт получателя <span className="text-red-500">*</span></span>}>
+                  <input placeholder="+7 701 …" value={form.contact} onChange={e=>set('contact',e.target.value)}
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 ${!form.contact.trim() ? 'border-red-200 bg-red-50' : 'border-gray-200'}`}
+                    style={{'--tw-ring-color':BRAND}}/>
+                  {!form.contact.trim() && <p className="text-xs text-red-500 mt-1">Обязательное поле</p>}
+                </FormField>
+              </>}
               {step===5&&<><FormField label="Компания поставщика">{I("supplierCompany","Название")}</FormField><FormField label="Контактное лицо">{I("supplierPerson","Имя")}</FormField><FormField label="Телефон">{I("supplierPhone","+7 …")}</FormField></>}
-              {step===6&&<div className="space-y-3"><div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">{[["Товар",form.product],["Кол-во",form.qty],["Срочность",form.urgency],["Подразделение",form.dept],["Юр. лицо",form.legalEntity],["Поставщик",form.supplierCompany]].filter(([,v])=>v).map(([l,v])=><div key={l} className="flex justify-between"><span className="text-gray-500">{l}</span><span className="font-medium text-gray-800">{v}</span></div>)}</div><FormField label="Комментарий"><textarea value={form.comment} onChange={e=>setForm({...form,comment:e.target.value})} rows={3} className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none resize-none" placeholder="Дополнительные детали…"/></FormField></div>}
+              {step===6&&<div className="space-y-3">
+                <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+                  {[["Категория",form.category==='Другое'?(form.categoryOther||'Другое'):form.category],["Срочность",form.urgency],["Подразделение",form.dept],["Бюдж. подразделение",form.budgetDept],["Юр. лицо",form.legalEntity],["Адрес доставки",form.address],["Контакт",form.contact],["Поставщик",form.supplierCompany]].filter(([,v])=>v).map(([l,v])=>(
+                    <div key={l} className="flex justify-between gap-4"><span className="text-gray-500 flex-shrink-0">{l}</span><span className="font-medium text-gray-800 text-right">{v}</span></div>
+                  ))}
+                </div>
+                {form.items.some(it=>it.name.trim()) && (
+                  <div className="rounded-xl overflow-hidden border border-gray-100 text-sm">
+                    <div className="grid grid-cols-2 bg-gray-50 px-4 py-2">
+                      <span className="text-xs font-semibold text-gray-500 uppercase">Наименование</span>
+                      <span className="text-xs font-semibold text-gray-500 uppercase text-right">Кол-во</span>
+                    </div>
+                    {form.items.filter(it=>it.name.trim()).map((it,i)=>(
+                      <div key={i} className="grid grid-cols-2 px-4 py-2 border-t border-gray-50">
+                        <span className="text-gray-700">{it.name}</span>
+                        <span className="font-medium text-gray-900 text-right">{it.qty}</span>
+                      </div>
+                    ))}
+                    <div className="grid grid-cols-2 px-4 py-2 border-t border-gray-200 bg-gray-50">
+                      <span className="text-xs font-semibold text-gray-500">Итого</span>
+                      <span className="text-xs font-semibold text-gray-800 text-right">{form.items.reduce((s,it)=>s+(parseFloat(it.qty)||0),0)}</span>
+                    </div>
+                  </div>
+                )}
+                <FormField label="Комментарий"><textarea value={form.comment} onChange={e=>setForm({...form,comment:e.target.value})} rows={3} className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none resize-none" placeholder="Дополнительные детали…"/></FormField>
+              </div>}
             </div>
             <div className="p-5 border-t border-gray-100 flex gap-3">
               {step>1&&<button onClick={()=>setStep(s=>s-1)} className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium">Назад</button>}
               {step<6
-                ? <button onClick={()=>setStep(s=>s+1)} className="flex-1 py-2.5 text-white rounded-xl text-sm font-semibold" style={{background:BRAND}}>Далее</button>
+                ? <button onClick={()=>{ if(!canGoNext()){toast.error('Заполните обязательные поля');return;} setStep(s=>s+1); }} className="flex-1 py-2.5 text-white rounded-xl text-sm font-semibold" style={{background:BRAND}}>Далее</button>
                 : <button onClick={submit} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold">✓ Отправить</button>}
             </div>
           </div>
