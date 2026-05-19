@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
+import { fmtDate } from '../lib/fmt';
 
 const BRAND   = '#28798d';
 const DARK    = '#1a3a42';
@@ -179,7 +180,7 @@ export default function Coffee({ user }) {
           style={{ background:'linear-gradient(135deg,#1a3a42 0%,#28798d 100%)', borderRadius:20, padding:'22px', color:'white' }}>
           <div style={{ fontSize:11, opacity:.55, letterSpacing:'0.08em', textTransform:'uppercase', marginBottom:4 }}>{order.id}</div>
           <div style={{ fontSize:18, fontWeight:700, marginBottom:2 }}>☕ Заказ на обжарку</div>
-          <div style={{ fontSize:12, opacity:.6, marginBottom:4 }}>📍 {order.city} · Подан: {order.date}</div>
+          <div style={{ fontSize:12, opacity:.6, marginBottom:4 }}>📍 {order.city} · Подан: {fmtDate(order.date)}</div>
           {order.deliveryDate && (
             <div style={{ fontSize:12, opacity:.8, marginBottom:16, background:'rgba(255,255,255,0.12)', display:'inline-flex',
               alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20 }}>
@@ -400,7 +401,7 @@ export default function Coffee({ user }) {
                 <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:8 }}>
                   <div>
                     <div style={{ fontSize:13, fontWeight:700, color:'#1a3a42' }}>{o.id}</div>
-                    <div style={{ fontSize:11, color:'#94a3b8', marginTop:2 }}>📍 {o.city} · {o.date}</div>
+                    <div style={{ fontSize:11, color:'#94a3b8', marginTop:2 }}>📍 {o.city} · {fmtDate(o.date)}</div>
                     {o.deliveryDate && (
                       <div style={{ fontSize:11, color:BRAND, marginTop:2, fontWeight:500 }}>
                         📅 Получить: {o.deliveryDate}

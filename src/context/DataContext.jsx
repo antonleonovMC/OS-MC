@@ -57,14 +57,6 @@ export function DataProvider({ children, onReady }) {
   useEffect(() => {
     async function load() {
       if (!sheetsReady()) {
-        // No URL yet — use seed data
-        setOrders(INIT_ORDERS);
-        setRequests(INIT_REQUESTS);
-        setInvoices(INIT_INVOICES.map(inv => ({ ...inv, payments: [], dueDate: '', comment: '' })));
-        setCoffees(INIT_COFFEE_ORDERS.map(o => ({
-          ...o, items: o.items.map(it => ({ ...it, shipped: it.shipped ?? 0 }))
-        })));
-        setTasks(INIT_TASKS);
         setLoading(false);
         onReady?.();
         return;
@@ -143,14 +135,7 @@ export function DataProvider({ children, onReady }) {
           }));
         }
       } catch {
-        // Fallback to seed on any fetch error
-        setOrders(INIT_ORDERS);
-        setRequests(INIT_REQUESTS);
-        setInvoices(INIT_INVOICES.map(inv => ({ ...inv, payments: [], dueDate: '', comment: '' })));
-        setCoffees(INIT_COFFEE_ORDERS.map(o => ({
-          ...o, items: o.items.map(it => ({ ...it, shipped: it.shipped ?? 0 }))
-        })));
-        setTasks(INIT_TASKS);
+        // On error — keep empty lists, don't show fake seed data
       }
       setLoading(false);
       onReady?.();
@@ -219,6 +204,11 @@ export function DataProvider({ children, onReady }) {
     updateRow('Заявки', id, { status, ...extra });
   }, []);
 
+  const deleteRequest = useCallback((id) => {
+    setRequests(p => p.filter(r => r.id !== id));
+    deleteRow('Заявки', id);
+  }, []);
+
   // ── INVOICES ────────────────────────────────────────────────────────────
   const addInvoice = useCallback((inv) => {
     setInvoices(p => [inv, ...p]);
@@ -284,7 +274,7 @@ export function DataProvider({ children, onReady }) {
       setOrders, setRequests, setInvoices, setCoffees, setTasks,
       // typed mutations (also sync to Sheets)
       addOrder, updateOrderStatus, updateOrder, toggleSubscription,
-      addRequest, updateRequestStatus,
+      addRequest, updateRequestStatus, deleteRequest,
       updateStaffMember,
       addInvoice, updateInvoice,
       addCoffeeOrder, updateCoffeeOrder,

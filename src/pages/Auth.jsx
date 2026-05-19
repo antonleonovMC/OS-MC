@@ -62,7 +62,9 @@ export default function Auth({ onLogin }) {
       localStorage.removeItem('mc_tg_id'); // stale id — clean up
     }
 
-    // 3. Not in Telegram — redirect to bot
+    // 3. Not in Telegram — on localhost show dev picker, else redirect to bot
+    const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    if (isLocal) { setPhase('devpicker'); return; }
     window.location.href = 'https://t.me/MC_OS_bot';
   }, [staff]);
 
@@ -100,7 +102,7 @@ export default function Auth({ onLogin }) {
     const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ') || '—';
     const username = tgUser.username ? '@' + tgUser.username : '—';
     await sendAccessRequest({
-      date: new Date().toLocaleString('ru-RU'),
+      date: new Date().toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' }),
       tg_id: tgUser.id, username,
       first_name: tgUser.first_name || '',
       last_name:  tgUser.last_name  || '',
@@ -168,6 +170,11 @@ export default function Auth({ onLogin }) {
         </motion.div>
 
         <AnimatePresence mode="wait">
+
+          {/* Dev picker — localhost only */}
+          {phase === 'devpicker' && (
+            <DevPicker users={staff?.length ? staff : DEFAULT_USERS} onLogin={doLogin} />
+          )}
 
           {/* Telegram Login Widget */}
           {phase === 'widget' && (
@@ -261,6 +268,39 @@ export default function Auth({ onLogin }) {
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+function DevPicker({ users, onLogin }) {
+  const [idx, setIdx] = useState(0);
+  const sorted = [...users].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ru'));
+  const pick = () => onLogin(sorted[idx], null);
+  return (
+    <motion.div key="devpicker"
+      initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-8 }}
+      transition={{ duration:0.2 }}
+      style={{ background:'white', borderRadius:20, boxShadow:'0 4px 32px rgba(40,121,141,0.10)', overflow:'hidden' }}>
+      <div style={{ background:`linear-gradient(135deg,${DARK},${BRAND})`, padding:'16px 20px' }}>
+        <div style={{ fontSize:13, fontWeight:700, color:'white' }}>Режим разработки</div>
+        <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', marginTop:2 }}>localhost — выберите пользователя</div>
+      </div>
+      <div style={{ padding:'18px 20px', display:'flex', flexDirection:'column', gap:12 }}>
+        <select value={idx} onChange={e => setIdx(Number(e.target.value))}
+          style={{ width:'100%', padding:'10px 12px', border:'1px solid #e2e8f0', borderRadius:12,
+            fontSize:13, outline:'none', background:'#f8fafc', color:DARK, cursor:'pointer' }}>
+          {sorted.map((u, i) => (
+            <option key={u.tg_id || i} value={i}>
+              {u.name || u.tg} — {u.role}
+            </option>
+          ))}
+        </select>
+        <button onClick={pick}
+          style={{ width:'100%', padding:'12px', borderRadius:14, background:BRAND, color:'white',
+            fontSize:13, fontWeight:700, border:'none', cursor:'pointer' }}>
+          Войти
+        </button>
+      </div>
+    </motion.div>
   );
 }
 

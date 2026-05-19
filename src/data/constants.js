@@ -25,11 +25,11 @@ export const ROLE_LABELS = {
 
 export const ROLE_ACCESS = {
   admin:         ["dashboard","logistics","requests","tasks","coffee","payments","feedback","staff"],
-  director_tk:   ["dashboard","logistics","requests","coffee","feedback"],
-  warehouse:     ["dashboard","logistics","requests","coffee","feedback"],
-  sales_manager: ["dashboard","logistics","requests","coffee","feedback"],
-  roaster:       ["dashboard","logistics","requests","coffee","feedback"],
-  reader:        ["dashboard","requests","feedback"],
+  director_tk:   ["logistics","requests","coffee","feedback"],
+  warehouse:     ["logistics","requests","coffee","feedback"],
+  sales_manager: ["logistics","requests","coffee","feedback"],
+  roaster:       ["logistics","requests","coffee","feedback"],
+  reader:        ["requests","feedback"],
 };
 
 // Склад, привязанный к роли "Обжарщик" — при создании/изменении заказа

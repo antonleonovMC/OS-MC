@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
+import { fmtDate } from '../lib/fmt';
 
 const BRAND = '#28798d';
 const DARK  = '#1a3a42';
@@ -18,8 +19,13 @@ const CATEGORIES = [
   'Оборудование', 'Маркетинг', 'Прочее',
 ];
 
-const CURRENCIES = ['KZT', 'USD', 'EUR', 'CNY'];
-const CUR_SIGN = { KZT: '₸', USD: '$', EUR: '€', CNY: '¥' };
+const CURRENCIES = ['KZT', 'USD', 'EUR', 'RUB'];
+const CUR_SIGN = { KZT: '₸', USD: '$', EUR: '€', RUB: '₽' };
+
+function isOverdue(req) {
+  if (!req.due_date || ['Оплачена','Закрыта','Отклонена'].includes(req.status)) return false;
+  return new Date(req.due_date) < new Date(new Date().toDateString());
+}
 
 const STATUS_STYLE = {
   'Новая':        { bg:'#eff6ff', color:'#2563eb', dot:'#3b82f6' },
@@ -32,6 +38,9 @@ const STATUS_STYLE = {
 const EMPTY_FORM = {
   legal_entity: LEGAL_ENTITIES[0],
   recipient: '',
+  bin: '',
+  bank: '',
+  iik: '',
   amount: '',
   currency: 'KZT',
   category: CATEGORIES[0],
@@ -70,11 +79,26 @@ export default function Payments({ user }) {
 
   const [tab,          setTab]          = useState('all');
   const [showForm,     setShowForm]     = useState(false);
+  const [step,         setStep]         = useState(1);
+  const [submitted,    setSubmitted]    = useState(false);
   const [selected,     setSelected]     = useState(null);
   const [form,         setForm]         = useState(EMPTY_FORM);
   const [rejectReason, setRejectReason] = useState('');
   const [showReject,   setShowReject]   = useState(false);
   const [rejectTarget, setRejectTarget] = useState(null);
+
+  const STEPS = ['Плательщик', 'Получатель', 'Платёж', 'Итого'];
+
+  const closeForm = () => { setShowForm(false); setStep(1); setForm(EMPTY_FORM); };
+
+  const canNext = () => {
+    if (step === 1) return !!form.legal_entity;
+    if (step === 2) return !!form.recipient;
+    if (step === 3) return !!form.amount && !!form.due_date && !!form.purpose;
+    return true;
+  };
+
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const isDirector  = ['admin', 'director_tk'].includes(user?.role);
   const isAdmin     = user?.role === 'admin';
@@ -100,11 +124,15 @@ export default function Payments({ user }) {
       return;
     }
     const id = `PAY-${String(requests.length + 1).padStart(3,'0')}`;
+    const now = new Date().toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric', timeZone:'Asia/Almaty' });
     addPaymentRequest({
       id,
       requester:    user?.name || user?.tg || '—',
       legal_entity: form.legal_entity,
       recipient:    form.recipient,
+      bin:          form.bin,
+      bank:         form.bank,
+      iik:          form.iik,
       amount:       Number(form.amount),
       currency:     form.currency,
       category:     form.category,
@@ -112,23 +140,27 @@ export default function Payments({ user }) {
       purpose:      form.purpose,
       comment:      form.comment,
       status:       'Новая',
-      created:      new Date().toLocaleDateString('ru-RU'),
+      created:      now,
       reject_reason: '',
       confirmed_by:  '',
       confirmed_at:  '',
       paid_by:       '',
       paid_at:       '',
+      history:       [{ status:'Новая', by: user?.name || user?.tg || '—', at: now }],
     });
-    setShowForm(false);
-    setForm(EMPTY_FORM);
-    toast.success(`Заявка ${id} отправлена на рассмотрение`);
+    closeForm();
+    setSubmitted(true);
+    setTimeout(() => setSubmitted(false), 2500);
   };
 
   const confirm = (req) => {
+    const now = new Date().toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric', timeZone:'Asia/Almaty' });
+    const by  = user?.name || user?.tg || '—';
     const patch = {
       status:       'Подтверждена',
-      confirmed_by: user?.name || user?.tg || '—',
-      confirmed_at: new Date().toLocaleDateString('ru-RU'),
+      confirmed_by: by,
+      confirmed_at: now,
+      history: [...(req.history || []), { status:'Подтверждена', by, at: now }],
     };
     updatePaymentRequest(req.id, patch);
     if (selected?.id === req.id) setSelected(p => ({ ...p, ...patch }));
@@ -143,7 +175,12 @@ export default function Payments({ user }) {
 
   const doReject = () => {
     if (!rejectReason.trim()) { toast.error('Укажите причину'); return; }
-    const patch = { status: 'Отклонена', reject_reason: rejectReason };
+    const now = new Date().toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric', timeZone:'Asia/Almaty' });
+    const by  = user?.name || user?.tg || '—';
+    const patch = {
+      status: 'Отклонена', reject_reason: rejectReason,
+      history: [...(rejectTarget.history || []), { status:'Отклонена', by, at: now, note: rejectReason }],
+    };
     updatePaymentRequest(rejectTarget.id, patch);
     if (selected?.id === rejectTarget.id) setSelected(p => ({ ...p, ...patch }));
     setShowReject(false);
@@ -152,10 +189,13 @@ export default function Payments({ user }) {
   };
 
   const markPaid = (req) => {
+    const now = new Date().toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric', timeZone:'Asia/Almaty' });
+    const by  = user?.name || user?.tg || '—';
     const patch = {
       status:  'Оплачена',
-      paid_by: user?.name || user?.tg || '—',
-      paid_at: new Date().toLocaleDateString('ru-RU'),
+      paid_by: by,
+      paid_at: now,
+      history: [...(req.history || []), { status:'Оплачена', by, at: now }],
     };
     updatePaymentRequest(req.id, patch);
     if (selected?.id === req.id) setSelected(p => ({ ...p, ...patch }));
@@ -202,18 +242,22 @@ export default function Payments({ user }) {
   // ── Detail view ──────────────────────────────────────────────────────────────
   if (selected) {
     const req = requests.find(r => r.id === selected.id) || selected;
+    const overdue = isOverdue(req);
     const rows = [
-      ['Юр.лицо',          req.legal_entity],
-      ['Получатель',        req.recipient],
-      ['Категория',         req.category],
-      ['Назначение',        req.purpose],
-      ['Дата оплаты',       req.due_date],
-      ['Подал(а)',          req.requester],
-      ['Дата заявки',       req.created],
-      req.confirmed_by && ['Подтвердил(а)', `${req.confirmed_by} · ${req.confirmed_at}`],
-      req.paid_by      && ['Оплатил(а)',    `${req.paid_by} · ${req.paid_at}`],
+      ['Юр.лицо',    req.legal_entity],
+      ['Получатель', req.recipient],
+      req.bin  && ['БИН/БИК',   req.bin],
+      req.bank && ['Банк',      req.bank],
+      req.iik  && ['ИИК (IBAN)', req.iik],
+      ['Категория',  req.category],
+      ['Назначение', req.purpose],
+      ['Дата оплаты', req.due_date ? `${fmtDate(req.due_date)}${overdue ? '  ⚠️ просрочено' : ''}` : '—'],
+      ['Подал(а)',   req.requester],
+      ['Дата заявки', fmtDate(req.created)],
+      req.confirmed_by  && ['Подтвердил(а)', `${req.confirmed_by} · ${fmtDate(req.confirmed_at)}`],
+      req.paid_by       && ['Оплатил(а)',    `${req.paid_by} · ${fmtDate(req.paid_at)}`],
       req.reject_reason && ['Причина отклонения', req.reject_reason],
-      req.comment      && ['Комментарий',   req.comment],
+      req.comment       && ['Комментарий',   req.comment],
     ].filter(Boolean);
 
     return (
@@ -245,11 +289,45 @@ export default function Payments({ user }) {
             <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start',
               padding:'12px 18px', borderBottom: i < rows.length-1 ? '1px solid #f8fafc' : 'none', gap:16 }}>
               <span style={{ fontSize:12, color:'#94a3b8', flexShrink:0 }}>{label}</span>
-              <span style={{ fontSize:12, fontWeight:500, color: label === 'Причина отклонения' ? '#e11d48' : DARK,
+              <span style={{ fontSize:12, fontWeight:500,
+                color: label === 'Причина отклонения' ? '#e11d48' : DARK,
                 textAlign:'right' }}>{value}</span>
             </div>
           ))}
         </div>
+
+        {/* История изменений */}
+        {req.history?.length > 0 && (
+          <div style={{ background:'white', borderRadius:16, border:'1px solid #e8f4f6', padding:'14px 18px' }}>
+            <div style={{ fontSize:12, fontWeight:600, color:'#1a3a42', marginBottom:12 }}>История</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+              {req.history.map((h, i) => {
+                const st = STATUS_STYLE[h.status] || STATUS_STYLE['Новая'];
+                const isLast = i === req.history.length - 1;
+                return (
+                  <div key={i} style={{ display:'flex', gap:12, position:'relative' }}>
+                    {/* Линия */}
+                    {!isLast && (
+                      <div style={{ position:'absolute', left:7, top:16, bottom:0, width:2,
+                        background:'#e8f4f6', zIndex:0 }}/>
+                    )}
+                    {/* Точка */}
+                    <div style={{ width:16, height:16, borderRadius:'50%', background:st.dot,
+                      flexShrink:0, marginTop:2, zIndex:1, boxShadow:`0 0 0 3px ${st.bg}` }}/>
+                    <div style={{ paddingBottom: isLast ? 0 : 14, flex:1 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                        <span style={{ fontSize:12, fontWeight:600, color:st.color }}>{h.status}</span>
+                        <span style={{ fontSize:10, color:'#94a3b8' }}>{h.at}</span>
+                      </div>
+                      <div style={{ fontSize:11, color:'#94a3b8', marginTop:1 }}>{h.by}</div>
+                      {h.note && <div style={{ fontSize:11, color:'#e11d48', marginTop:2 }}>{h.note}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Actions */}
         {req.status === 'Новая' && isDirector && (
@@ -362,11 +440,19 @@ export default function Payments({ user }) {
               </div>
 
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: (req.status==='Новая'&&isDirector)||(req.status==='Подтверждена'&&isAdmin) ? 10 : 0 }}>
-                <StatusPill s={req.status} />
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <StatusPill s={req.status} />
+                  {isOverdue(req) && (
+                    <span style={{ fontSize:10, fontWeight:600, color:'#e11d48', background:'#fff1f2',
+                      padding:'2px 8px', borderRadius:20 }}>просрочено</span>
+                  )}
+                </div>
                 <div style={{ display:'flex', gap:8, alignItems:'center' }}>
                   <span style={{ fontSize:10, color:'#94a3b8' }}>{req.category}</span>
                   {req.due_date && (
-                    <span style={{ fontSize:10, color:'#94a3b8' }}>📅 {req.due_date}</span>
+                    <span style={{ fontSize:10, color: isOverdue(req) ? '#e11d48' : '#94a3b8' }}>
+                      📅 {fmtDate(req.due_date)}
+                    </span>
                   )}
                 </div>
               </div>
@@ -408,93 +494,185 @@ export default function Payments({ user }) {
 
       <div className="h-16 lg:hidden" />
 
-      {/* Create form */}
+      {/* Success overlay */}
+      <AnimatePresence>
+        {submitted && (
+          <motion.div className="fixed inset-0 z-[60] flex items-center justify-center"
+            initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+            style={{background:'rgba(0,0,0,0.45)', backdropFilter:'blur(4px)'}}>
+            <motion.div initial={{scale:0.85,opacity:0}} animate={{scale:1,opacity:1}} exit={{scale:0.85,opacity:0}}
+              transition={{type:'spring',stiffness:380,damping:28}}
+              style={{background:'white',borderRadius:24,padding:'44px 40px',textAlign:'center',minWidth:260}}>
+              <motion.div initial={{scale:0}} animate={{scale:1}} transition={{type:'spring',stiffness:320,damping:20}}
+                style={{fontSize:52,marginBottom:14}}>✅</motion.div>
+              <div style={{fontSize:18,fontWeight:800,color:DARK,marginBottom:6}}>Заявка отправлена!</div>
+              <div style={{fontSize:13,color:'#6b7280'}}>Ожидайте подтверждения</div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Create form — wizard */}
       <AnimatePresence>
         {showForm && (
           <motion.div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
             initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-            style={{background:'rgba(0,0,0,0.5)'}} onClick={() => setShowForm(false)}>
+            style={{background:'rgba(0,0,0,0.5)'}} onClick={closeForm}>
             <motion.div initial={{y:32,opacity:0}} animate={{y:0,opacity:1}} exit={{y:20,opacity:0}}
               transition={{duration:0.22}}
               className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
               onClick={e => e.stopPropagation()}>
-              <div style={{ padding:'18px 20px 14px', borderBottom:'1px solid #f1f5f9',
-                display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                <span style={{ fontSize:15, fontWeight:700, color:DARK }}>Заявка на оплату</span>
-                <button onClick={() => setShowForm(false)}
-                  style={{ color:'#94a3b8', fontSize:18, background:'none', border:'none', cursor:'pointer' }}>✕</button>
+
+              {/* Header + stepper */}
+              <div style={{padding:'18px 20px 14px', borderBottom:'1px solid #f1f5f9'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+                  <span style={{fontSize:15,fontWeight:700,color:DARK}}>Заявка на оплату</span>
+                  <button onClick={closeForm} style={{color:'#94a3b8',fontSize:18,background:'none',border:'none',cursor:'pointer'}}>✕</button>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:0}}>
+                  {STEPS.map((label, i) => (
+                    <div key={i} style={{display:'flex',alignItems:'center',flex:1}}>
+                      <div style={{
+                        width:28,height:28,borderRadius:'50%',display:'flex',alignItems:'center',
+                        justifyContent:'center',fontSize:11,fontWeight:700,flexShrink:0,
+                        background: step>i+1?'#10b981':step===i+1?BRAND:'#f1f5f9',
+                        color: step>=i+1?'white':'#94a3b8',
+                      }}>{step>i+1?'✓':i+1}</div>
+                      {i<STEPS.length-1&&<div style={{flex:1,height:2,margin:'0 4px',background:step>i+1?'#10b981':'#e2e8f0'}}/>}
+                    </div>
+                  ))}
+                </div>
+                <div style={{fontSize:11,color:'#94a3b8',marginTop:8}}>
+                  Шаг {step} из {STEPS.length}: <b style={{color:DARK}}>{STEPS[step-1]}</b>
+                </div>
               </div>
 
-              <div style={{ padding:'18px 20px', display:'flex', flexDirection:'column', gap:14 }}>
-                <div>
-                  <FL>Юр.лицо плательщика *</FL>
-                  <select value={form.legal_entity} onChange={e => setForm(p => ({...p, legal_entity:e.target.value}))}
-                    style={INP}>
-                    {LEGAL_ENTITIES.map(l => <option key={l}>{l}</option>)}
-                  </select>
-                </div>
+              {/* Step content */}
+              <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
 
-                <div>
-                  <FL>Получатель *</FL>
-                  <input value={form.recipient} onChange={e => setForm(p => ({...p, recipient:e.target.value}))}
-                    placeholder="Название компании / ФИО" style={INP}/>
-                </div>
-
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                {step===1 && <>
                   <div>
-                    <FL>Сумма *</FL>
-                    <input type="number" value={form.amount} onChange={e => setForm(p => ({...p, amount:e.target.value}))}
-                      placeholder="0" style={INP}/>
-                  </div>
-                  <div>
-                    <FL>Валюта</FL>
-                    <select value={form.currency} onChange={e => setForm(p => ({...p, currency:e.target.value}))}
-                      style={INP}>
-                      {CURRENCIES.map(c => <option key={c}>{c}</option>)}
+                    <FL>Юр.лицо плательщика *</FL>
+                    <select value={form.legal_entity} onChange={e=>set('legal_entity',e.target.value)} style={INP}>
+                      {LEGAL_ENTITIES.map(l=><option key={l}>{l}</option>)}
                     </select>
                   </div>
-                </div>
+                  <div>
+                    <FL>Подающий заявку</FL>
+                    <input value={user?.name||user?.tg||''} readOnly
+                      style={{...INP,background:'#f8fafc',color:'#94a3b8'}}/>
+                  </div>
+                </>}
 
-                <div>
-                  <FL>Категория</FL>
-                  <select value={form.category} onChange={e => setForm(p => ({...p, category:e.target.value}))}
-                    style={INP}>
-                    {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-                  </select>
-                </div>
+                {step===2 && <>
+                  <div>
+                    <FL>Получатель *</FL>
+                    <input value={form.recipient} onChange={e=>set('recipient',e.target.value)}
+                      placeholder="Название компании / ФИО" style={INP} autoFocus/>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                    <div>
+                      <FL>БИН / ИИН</FL>
+                      <input value={form.bin} onChange={e=>set('bin',e.target.value)}
+                        placeholder="123456789012" style={INP} maxLength={12}/>
+                    </div>
+                    <div>
+                      <FL>Банк</FL>
+                      <input value={form.bank} onChange={e=>set('bank',e.target.value)}
+                        placeholder="Kaspi, Halyk…" style={INP}/>
+                    </div>
+                  </div>
+                  <div>
+                    <FL>ИИК (IBAN)</FL>
+                    <input value={form.iik} onChange={e=>set('iik',e.target.value)}
+                      placeholder="KZ00 0000 0000 0000 0000" style={INP}/>
+                  </div>
+                </>}
 
-                <div>
-                  <FL>Желаемая дата оплаты *</FL>
-                  <input type="date" value={form.due_date} onChange={e => setForm(p => ({...p, due_date:e.target.value}))}
-                    style={INP}/>
-                </div>
+                {step===3 && <>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                    <div>
+                      <FL>Сумма *</FL>
+                      <input type="number" value={form.amount} onChange={e=>set('amount',e.target.value)}
+                        placeholder="0" style={INP} autoFocus/>
+                    </div>
+                    <div>
+                      <FL>Валюта</FL>
+                      <select value={form.currency} onChange={e=>set('currency',e.target.value)} style={INP}>
+                        {CURRENCIES.map(c=><option key={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <FL>Категория</FL>
+                    <select value={form.category} onChange={e=>set('category',e.target.value)} style={INP}>
+                      {CATEGORIES.map(c=><option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <FL>Назначение платежа *</FL>
+                    <input value={form.purpose} onChange={e=>set('purpose',e.target.value)}
+                      placeholder="За что платим" style={INP}/>
+                  </div>
+                  <div>
+                    <FL>Желаемая дата оплаты *</FL>
+                    <input type="date" value={form.due_date} onChange={e=>set('due_date',e.target.value)} style={INP}/>
+                  </div>
+                  <div>
+                    <FL>Комментарий</FL>
+                    <textarea value={form.comment} onChange={e=>set('comment',e.target.value)}
+                      rows={2} placeholder="Дополнительно…" style={{...INP,resize:'none'}}/>
+                  </div>
+                </>}
 
-                <div>
-                  <FL>Назначение платежа *</FL>
-                  <input value={form.purpose} onChange={e => setForm(p => ({...p, purpose:e.target.value}))}
-                    placeholder="За что платим" style={INP}/>
-                </div>
-
-                <div>
-                  <FL>Комментарий</FL>
-                  <textarea value={form.comment} onChange={e => setForm(p => ({...p, comment:e.target.value}))}
-                    rows={2} placeholder="Дополнительно…"
-                    style={{ ...INP, resize:'none' }}/>
-                </div>
+                {step===4 && (
+                  <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                    <div style={{background:'#f8fafc',borderRadius:14,padding:'14px 16px'}}>
+                      {[
+                        ['Юр.лицо', form.legal_entity],
+                        ['Получатель', form.recipient],
+                        form.bin  && ['БИН', form.bin],
+                        form.bank && ['Банк', form.bank],
+                        form.iik  && ['ИИК', form.iik],
+                        ['Сумма', `${CUR_SIGN[form.currency]}${Number(form.amount).toLocaleString('ru-RU')} ${form.currency}`],
+                        ['Категория', form.category],
+                        ['Назначение', form.purpose],
+                        ['Дата оплаты', form.due_date],
+                        form.comment && ['Комментарий', form.comment],
+                      ].filter(Boolean).map(([l,v],i)=>(
+                        <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',
+                          padding:'7px 0',borderBottom:'1px solid #e8f4f6',gap:12}}>
+                          <span style={{fontSize:11,color:'#94a3b8',flexShrink:0}}>{l}</span>
+                          <span style={{fontSize:12,fontWeight:600,color:DARK,textAlign:'right'}}>{v}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div style={{ padding:'12px 20px 20px', borderTop:'1px solid #f1f5f9', display:'flex', gap:10 }}>
-                <button onClick={() => setShowForm(false)}
-                  style={{ flex:1, padding:'12px', borderRadius:12, background:'#f1f5f9', color:'#64748b',
-                    fontSize:13, border:'none', cursor:'pointer' }}>
-                  Отмена
-                </button>
-                <button onClick={submit}
-                  style={{ flex:1, padding:'12px', borderRadius:12, background:BRAND, color:'white',
-                    fontSize:13, fontWeight:600, border:'none', cursor:'pointer',
-                    opacity: (!form.recipient || !form.amount || !form.due_date || !form.purpose) ? 0.5 : 1 }}>
-                  Отправить
-                </button>
+              {/* Footer buttons */}
+              <div style={{padding:'12px 20px 20px',borderTop:'1px solid #f1f5f9',display:'flex',gap:10}}>
+                {step>1
+                  ? <button onClick={()=>setStep(s=>s-1)}
+                      style={{flex:1,padding:'12px',borderRadius:12,background:'#f1f5f9',color:'#64748b',fontSize:13,border:'none',cursor:'pointer'}}>
+                      Назад
+                    </button>
+                  : <button onClick={closeForm}
+                      style={{flex:1,padding:'12px',borderRadius:12,background:'#f1f5f9',color:'#64748b',fontSize:13,border:'none',cursor:'pointer'}}>
+                      Отмена
+                    </button>
+                }
+                {step<4
+                  ? <button onClick={()=>{ if(!canNext()){toast.error('Заполните обязательные поля');return;} setStep(s=>s+1); }}
+                      style={{flex:1,padding:'12px',borderRadius:12,background:BRAND,color:'white',fontSize:13,fontWeight:600,border:'none',cursor:'pointer'}}>
+                      Далее →
+                    </button>
+                  : <button onClick={submit}
+                      style={{flex:1,padding:'12px',borderRadius:12,background:'#059669',color:'white',fontSize:13,fontWeight:700,border:'none',cursor:'pointer'}}>
+                      ✓ Отправить
+                    </button>
+                }
               </div>
             </motion.div>
           </motion.div>

@@ -483,16 +483,20 @@ function doPost(e) {
 
     if (action === 'notify_requests') {
       const ALWAYS_NOTIFY = [799893273, 1433619908];
-      const { employee, category, product, urgency, dept } = data;
+      const { employee, category, items, comment, urgency, dept } = data;
 
       const urgencyIcon = { 'Критично': '🔴', 'Срочно': '🟡', 'Обычная': '🟢' }[urgency] || '⚪';
-      const msg =
+      const itemLines = Array.isArray(items) && items.length
+        ? items.map(function(it) { return '  ' + (it.name || '—') + ' — ' + (it.qty || '—'); }).join('\n')
+        : '—';
+      let msg =
         '📋 <b>Новая заявка на закуп</b>\n\n' +
         '👤 Сотрудник: ' + (employee || '—') + '\n' +
         '🏢 Подразделение: ' + (dept || '—') + '\n' +
         '📦 Категория: ' + (category || '—') + '\n' +
-        '🛒 Товар: ' + (product || '—') + '\n' +
-        urgencyIcon + ' Срочность: ' + (urgency || '—');
+        urgencyIcon + ' Срочность: ' + (urgency || '—') + '\n\n' +
+        '🛒 <b>Товары:</b>\n' + itemLines;
+      if (comment) msg += '\n\n💬 ' + comment;
 
       let sent = 0;
       const notified = new Set();
@@ -615,16 +619,20 @@ function doPost(e) {
 
     if (action === 'notify_requests') {
   const ALWAYS_NOTIFY = [799893273, 1433619908];
-  const { employee, category, product, urgency, dept } = data;
+  const { employee, category, items, comment, urgency, dept } = data;
 
   const urgencyIcon = { 'Критично': '🔴', 'Срочно': '🟡', 'Обычная': '🟢' }[urgency] || '⚪';
-  const msg =
+  const itemLines = Array.isArray(items) && items.length
+    ? items.map(function(it) { return '  ' + (it.name || '—') + ' — ' + (it.qty || '—'); }).join('\n')
+    : '—';
+  let msg =
     '📋 <b>Новая заявка на закуп</b>\n\n' +
     '👤 Сотрудник: ' + (employee || '—') + '\n' +
     '🏢 Подразделение: ' + (dept || '—') + '\n' +
     '📦 Категория: ' + (category || '—') + '\n' +
-    '🛒 Товар: ' + (product || '—') + '\n' +
-    urgencyIcon + ' Срочность: ' + (urgency || '—');
+    urgencyIcon + ' Срочность: ' + (urgency || '—') + '\n\n' +
+    '🛒 <b>Товары:</b>\n' + itemLines;
+  if (comment) msg += '\n\n💬 ' + comment;
 
   let sent = 0;
   const notified = new Set();

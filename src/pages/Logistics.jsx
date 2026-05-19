@@ -3,10 +3,18 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WAREHOUSES, STATUS_FLOW, STATUS_DOT, ROASTERY_WAREHOUSE, genCode, makeHistory, advanceHistory, nowAstanaStr } from '../data/constants';
 import { useData } from '../context/DataContext';
+import { deleteRow } from '../lib/sheetsAPI';
 import Badge from '../components/Badge';
 import StatusTimeline from '../components/StatusTimeline';
 
 const BRAND = '#28798d';
+
+const fmtDate = (d) => {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt)) return d;
+  return dt.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Almaty' });
+};
 
 // ── Icon primitives ──────────────────────────────────────────────────────────
 const IcoSearch = () => (
@@ -54,7 +62,7 @@ const itemVariants = {
 };
 
 export default function Logistics({ user }) {
-  const { orders, addOrder, updateOrderStatus, updateOrder, subscriptions, toggleSubscription, staff } = useData();
+  const { orders, setOrders, addOrder, updateOrderStatus, updateOrder, subscriptions, toggleSubscription, staff } = useData();
   const [sel, setSel]           = useState(null);
   const [search, setSearch]     = useState('');
   const [whFilter, setWhFilter] = useState('Все склады');
@@ -62,7 +70,10 @@ export default function Logistics({ user }) {
   const [showCreate, setShowCreate]     = useState(false);
   const [editMode,  setEditMode]  = useState(false);
   const [editData,  setEditData]  = useState(null);
-  const [subOpen,   setSubOpen]   = useState(true);
+  const [subOpen,        setSubOpen]        = useState(true);
+  const [deliveredOpen,  setDeliveredOpen]  = useState(false);
+  const [statusOpen,     setStatusOpen]     = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [newOrder, setNewOrder] = useState({
     title:'', supplier:'', warehouse:'Астана', planDate:'', status:'Принят', comment:'',
     country:'РК', items:[{ name:'', qty:'', unit:'шт' }],
@@ -226,6 +237,15 @@ export default function Logistics({ user }) {
     toast.success('Заказ обновлён');
   };
 
+  async function deleteOrder() {
+    if (!sel) return;
+    await deleteRow('Заказы', sel.id);
+    setOrders(prev => prev.filter(o => o.id !== sel.id));
+    setSel(null);
+    setDeleteConfirm(false);
+    toast.success('Заказ удалён');
+  }
+
   const setEditItem = (i, field, val) =>
     setEditData(p => ({ ...p, items: p.items.map((it, idx) => idx === i ? { ...it, [field]: val } : it) }));
 
@@ -247,7 +267,6 @@ export default function Logistics({ user }) {
           {[
             ['Название', 'title', 'text'],
             ['Поставщик', 'supplier', 'text'],
-            ['Дата плана', 'planDate', 'text'],
           ].map(([label, field]) => (
             <div key={field}>
               <div className="text-xs text-gray-500 mb-1">{label}</div>
@@ -256,6 +275,14 @@ export default function Logistics({ user }) {
                 style={{ '--tw-ring-color': BRAND }} />
             </div>
           ))}
+          <div>
+            <div className="text-xs text-gray-500 mb-1">Дата плана</div>
+            <input type="date"
+              value={editData.planDate ? (() => { const d = new Date(editData.planDate); return isNaN(d) ? '' : d.toISOString().slice(0,10); })() : ''}
+              onChange={e => setEditData(p => ({ ...p, planDate: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2"
+              style={{ '--tw-ring-color': BRAND }} />
+          </div>
           <div>
             <div className="text-xs text-gray-500 mb-1">Статус</div>
             <div className="flex flex-wrap gap-1.5">
@@ -326,34 +353,43 @@ export default function Logistics({ user }) {
 
   // ── Detail view ─────────────────────────────────────────────────────────────
   if (sel) return (
-    <div className="space-y-4">
+    <>
+    <div className="space-y-4 overflow-x-hidden w-full">
       <button onClick={() => setSel(null)} className="flex items-center gap-1.5 text-gray-500 hover:text-gray-800 text-sm font-medium transition-colors">
         <IcoBack /> Назад к списку
       </button>
 
-      <div className="max-w-xl mx-auto bg-white rounded-2xl shadow-lg overflow-hidden">
+      <div className="w-full max-w-xl mx-auto bg-white rounded-2xl shadow-lg overflow-y-auto" style={{maxHeight:'calc(100vh - 8rem)'}}>
         {/* Header */}
         <div className="p-5 border-b border-gray-100">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">ЗАЯВКА #{sel.id}</span>
-                <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-mono rounded-lg">{sel.code}</span>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">ЗАЯВКА #{sel.id}</span>
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-mono rounded-lg">{sel.code}</span>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 break-words">{sel.title}</h2>
               </div>
-              <h2 className="text-xl font-bold text-gray-900 truncate">{sel.title}</h2>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button onClick={e => toggleSub(sel, e)} title={isSubscribed(sel.id) ? 'Отписаться' : 'Подписаться'}>
+                  <IcoBell active={isSubscribed(sel.id)} />
+                </button>
+                <Badge s={sel.status} />
+              </div>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {isAdmin && (
+            {isAdmin && (
+              <div className="flex gap-2">
                 <button onClick={startEdit}
-                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors text-gray-600">
+                  className="flex-1 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors text-gray-600">
                   ✏️ Изменить
                 </button>
-              )}
-              <button onClick={e => toggleSub(sel, e)} title={isSubscribed(sel.id) ? 'Отписаться' : 'Подписаться'}>
-                <IcoBell active={isSubscribed(sel.id)} />
-              </button>
-              <Badge s={sel.status} />
-            </div>
+                <button onClick={() => setDeleteConfirm(true)}
+                  className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-xs font-medium transition-colors">
+                  🗑 Удалить
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -363,7 +399,7 @@ export default function Logistics({ user }) {
             ["Поставщик",         sel.supplier],
             ["Страна отправления",sel.country || "—"],
             ["Склад",             sel.warehouse],
-            ["Дата плана",        sel.planDate],
+            ["Дата плана",        fmtDate(sel.planDate)],
             ["Код заказа",        sel.code],
             ["Создан",            sel.created],
           ].map(([l, v]) => (
@@ -417,6 +453,31 @@ export default function Logistics({ user }) {
         </div>
       </div>
     </div>
+    {deleteConfirm && (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Удалить заказ?</h3>
+          <p className="text-sm text-gray-500 mb-6">
+            <b>{sel?.title}</b> будет удалён без возможности восстановления.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setDeleteConfirm(false)}
+              className="flex-1 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+            >
+              Отмена
+            </button>
+            <button
+              onClick={deleteOrder}
+              className="flex-1 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600"
+            >
+              Удалить
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 
   // ── List view ─────────────────────────────────────────────────────────────
@@ -441,49 +502,139 @@ export default function Logistics({ user }) {
             </button>
           )}
         </div>
-        <select value={whFilter} onChange={e => { setWhFilter(e.target.value); setStatusFilter(null); }}
-          className="w-full sm:w-auto px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500 bg-white">
-          {WAREHOUSES.map(w => <option key={w}>{w}</option>)}
-        </select>
-      </div>
-
-      {/* Nearest banner */}
-      {nearest && (
-        <div className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-2xl p-4 cursor-pointer hover:from-slate-700 hover:to-slate-600 transition-all"
-          onClick={() => setSel(nearest)}>
-          <div className="text-slate-400 text-xs font-medium mb-1">Ближайшее поступление</div>
-          <div className="text-white font-bold text-base">{nearest.supplier}</div>
-          <div className="text-slate-400 text-sm mt-0.5">{nearest.title} · {nearest.planDate}</div>
-          <div className="text-slate-500 text-xs mt-1 font-mono">{nearest.code}</div>
-        </div>
-      )}
-
-      {/* Clickable status filters */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4">
-        <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-3">
-          Статус — Активные
-          {statusFilter && (
-            <button onClick={() => setStatusFilter(null)} className="ml-3 text-teal-600 normal-case tracking-normal font-medium hover:underline">
-              сбросить ✕
-            </button>
-          )}
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {STATUS_FLOW.map(s => {
-            const cnt    = countFor(s);
-            const dot    = STATUS_DOT[s] || "bg-gray-400";
-            const active = statusFilter === s;
+        {/* iOS-style warehouse tab bar */}
+        <div className="scroll-x-hide overflow-x-auto"
+          style={{ background:'#1a2e35', borderRadius:14, padding:'4px', display:'flex', gap:2 }}>
+          {WAREHOUSES.map(w => {
+            const active = whFilter === w;
+            const label  = w === 'Все склады' ? 'Все' : w;
             return (
-              <button key={s} onClick={() => setStatusFilter(active ? null : s)}
-                className={`flex items-center gap-2 px-2.5 py-2 rounded-xl transition-all text-left ${active ? "bg-teal-50 border border-teal-200 shadow-sm" : "hover:bg-gray-50 border border-transparent"}`}>
-                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
-                <span className={`text-xs flex-1 ${active ? "text-teal-700 font-semibold" : "text-gray-600"}`}>{s}</span>
-                <span className={`text-xs font-bold ml-auto ${active ? "text-teal-700" : cnt > 0 ? "text-gray-800" : "text-gray-300"}`}>{cnt}</span>
+              <button key={w}
+                onClick={() => { setWhFilter(w); setStatusFilter(null); }}
+                style={{
+                  flexShrink: 0,
+                  padding: '6px 14px',
+                  borderRadius: 10,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: active ? 700 : 500,
+                  whiteSpace: 'nowrap',
+                  transition: 'all .18s',
+                  background: active ? 'white' : 'transparent',
+                  color: active ? '#1a2e35' : 'rgba(255,255,255,0.55)',
+                  boxShadow: active ? '0 2px 8px rgba(0,0,0,0.18)' : 'none',
+                }}>
+                {label}
               </button>
             );
           })}
         </div>
       </div>
+
+
+      {/* Status filter — iOS dark dropdown */}
+      {(() => {
+        const DOT_HEX = { "Принят":"#3b82f6","Оплачен":"#14b8a6","В работе":"#eab308","В пути":"#a855f7","Таможня":"#f97316","Доставлен":"#22c55e","Архив":"#9ca3af" };
+        const totalCnt = orders.filter(o => whFilter === 'Все склады' || o.warehouse === whFilter).length;
+        const displayLabel = statusFilter || 'Все поставки';
+        const displayDot   = statusFilter ? DOT_HEX[statusFilter] : null;
+        const displayCnt   = statusFilter ? countFor(statusFilter) : totalCnt;
+        return (
+          <div style={{ position:'relative' }}>
+            {/* Trigger — light style */}
+            <button onClick={() => setStatusOpen(v => !v)}
+              style={{
+                background: 'white', borderRadius: 14, padding: '9px 14px',
+                display:'flex', alignItems:'center', justifyContent:'space-between',
+                width:'100%', border:'1px solid #e5e7eb', cursor:'pointer',
+                boxShadow:'0 1px 4px rgba(0,0,0,0.06)',
+              }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                {displayDot && (
+                  <span style={{ width:8, height:8, borderRadius:'50%', background: displayDot, flexShrink:0,
+                    boxShadow:`0 0 6px ${displayDot}88` }} />
+                )}
+                <span style={{ fontSize:13, fontWeight:700, color:'#1a3a42' }}>{displayLabel}</span>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <span style={{ fontSize:11, fontWeight:700, padding:'1px 8px', borderRadius:20,
+                  background:'#f3f4f6', color:'#6b7280' }}>
+                  {displayCnt}
+                </span>
+                <motion.svg width="14" height="14" viewBox="0 0 20 20" fill="none"
+                  stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  animate={{ rotate: statusOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                  <path d="M5 7.5l5 5 5-5"/>
+                </motion.svg>
+              </div>
+            </button>
+
+            {/* Dropdown panel */}
+            {statusOpen && <div className="fixed inset-0 z-20" onClick={() => setStatusOpen(false)} />}
+            <AnimatePresence>
+              {statusOpen && (
+                <motion.div
+                  initial={{ opacity:0, y:-6, scale:0.97 }}
+                  animate={{ opacity:1, y:0, scale:1 }}
+                  exit={{ opacity:0, y:-6, scale:0.97 }}
+                  transition={{ duration:0.15, ease:'easeOut' }}
+                  style={{
+                    position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:31,
+                    background:'white', borderRadius:14, padding:8,
+                    boxShadow:'0 8px 28px rgba(0,0,0,0.12)', border:'1px solid #e5e7eb',
+                  }}>
+                  {/* Все */}
+                  <button onClick={() => { setStatusFilter(null); setStatusOpen(false); }}
+                    style={{
+                      width:'100%', background: !statusFilter ? `${BRAND}12` : 'transparent',
+                      border: !statusFilter ? `1.5px solid ${BRAND}33` : '1.5px solid transparent',
+                      borderRadius:10, padding:'8px 12px', cursor:'pointer',
+                      display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4,
+                    }}>
+                    <span style={{ fontSize:12, fontWeight:700, color: !statusFilter ? BRAND : '#374151' }}>
+                      Все поставки
+                    </span>
+                    <span style={{ fontSize:11, fontWeight:700, padding:'1px 7px', borderRadius:20,
+                      background: !statusFilter ? `${BRAND}20` : '#f3f4f6',
+                      color: !statusFilter ? BRAND : '#6b7280' }}>
+                      {totalCnt}
+                    </span>
+                  </button>
+                  {/* Grid 3-col */}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+                    {STATUS_FLOW.map(s => {
+                      const cnt    = countFor(s);
+                      const active = statusFilter === s;
+                      const dot    = DOT_HEX[s] || '#9ca3af';
+                      return (
+                        <button key={s}
+                          onClick={() => { setStatusFilter(active ? null : s); setStatusOpen(false); }}
+                          style={{
+                            background: active ? `${BRAND}12` : '#f9fafb',
+                            border: active ? `1.5px solid ${BRAND}33` : '1.5px solid #f3f4f6',
+                            borderRadius:10, padding:'7px 4px',
+                            display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+                            cursor:'pointer', transition:'all .12s',
+                          }}>
+                          <span style={{ width:7, height:7, borderRadius:'50%', background: dot,
+                            boxShadow: cnt > 0 ? `0 0 5px ${dot}77` : 'none' }} />
+                          <span style={{ fontSize:10, fontWeight:600, lineHeight:1.2, textAlign:'center',
+                            color: active ? BRAND : '#374151' }}>{s}</span>
+                          <span style={{ fontSize:10, fontWeight:800,
+                            color: active ? BRAND : cnt > 0 ? '#1a3a42' : '#d1d5db' }}>
+                            {cnt}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })()}
 
       {/* Мои подписки */}
       {subscriptions.some(s => s.tg_id === user.tg_id) && (
@@ -511,7 +662,7 @@ export default function Logistics({ user }) {
                       className="px-5 py-3 hover:bg-gray-50 cursor-pointer transition-colors flex items-center gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-gray-800 truncate">{o.title}</div>
-                        <div className="text-xs text-gray-400 mt-0.5">{o.supplier} · {o.planDate}</div>
+                        <div className="text-xs text-gray-400 mt-0.5">{o.supplier} · {fmtDate(o.planDate)}</div>
                       </div>
                       <Badge s={o.status} />
                       <button onClick={e => toggleSub(o, e)}
@@ -528,25 +679,14 @@ export default function Logistics({ user }) {
       )}
 
       {/* Orders list */}
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-          <span className="text-sm font-semibold text-gray-700">
-            {statusFilter || "Все поставки"}
-            {whFilter !== "Все склады" && <span className="text-gray-400 ml-1">· {whFilter}</span>}
-          </span>
-          <span className="text-sm font-bold text-gray-400">{filtered.length}</span>
-        </div>
-
-        {filtered.length === 0 ? (
-          <div className="py-12 text-center text-gray-400 text-sm">Нет поставок по выбранным фильтрам</div>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            <AnimatePresence initial={false}>
-              {filtered.map((o, i) => (
+      {(() => {
+        const active   = filtered.filter(o => o.status !== 'Доставлен');
+        const delivered = filtered.filter(o => o.status === 'Доставлен');
+        const renderCard = (o, i) => (
                 <motion.div key={o.id}
                   custom={i} variants={itemVariants} initial="hidden" animate="visible"
                   onClick={() => setSel(o)}
-                  className="px-5 py-4 hover:bg-gray-50 cursor-pointer transition-colors">
+                  className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 cursor-pointer active:scale-[0.98] transition-transform hover:shadow-md hover:border-gray-200">
                   <div className="flex items-start justify-between mb-1.5">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -567,15 +707,110 @@ export default function Logistics({ user }) {
                   <div className="text-xs text-gray-500 mb-2">{o.supplier}</div>
                   <div className="flex items-center gap-3 text-xs text-gray-400">
                     <span className="flex items-center gap-1"><IcoBox /> {o.items.reduce((a,b) => a + Number(b.qty||0), 0)}</span>
-                    <span className="flex items-center gap-1"><IcoCalendar /> {o.planDate}</span>
+                    <span className="flex items-center gap-1"><IcoCalendar /> {fmtDate(o.planDate)}</span>
                     <span className="flex items-center gap-1 ml-auto"><IcoPin /> {o.warehouse}</span>
                   </div>
+                  {/* Mini status stepper */}
+                  {(() => {
+                    const flow = visibleStatuses(o);
+                    const curIdx = flow.indexOf(o.status);
+                    if (curIdx < 0 || o.status === 'Архив') return null;
+                    const DOT_COLORS = { "Принят":"#3b82f6","Оплачен":"#14b8a6","В работе":"#eab308","В пути":"#a855f7","Таможня":"#f97316","Доставлен":"#22c55e" };
+                    const activeColor = DOT_COLORS[o.status] || BRAND;
+                    return (
+                      <div style={{ display:'flex', alignItems:'center', marginTop:10 }}>
+                        {flow.map((s, i) => {
+                          const done   = i < curIdx;
+                          const isCur  = i === curIdx;
+                          const color  = done ? BRAND : isCur ? activeColor : '#e2e8f0';
+                          return (
+                            <div key={s} style={{ display:'flex', alignItems:'center', flex: i < flow.length - 1 ? 1 : 'none' }}>
+                              <div style={{
+                                width: isCur ? 9 : 6, height: isCur ? 9 : 6,
+                                borderRadius: '50%', flexShrink: 0,
+                                background: color,
+                                boxShadow: isCur ? `0 0 0 2.5px white, 0 0 0 4px ${activeColor}` : 'none',
+                                transition: 'all .2s',
+                              }} />
+                              {i < flow.length - 1 && (
+                                <div style={{ flex:1, height:2, margin:'0 3px',
+                                  background: done ? BRAND : '#e2e8f0',
+                                  borderRadius:1 }} />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </motion.div>
-              ))}
-            </AnimatePresence>
+        );
+
+        return (
+          <div className="space-y-4">
+            {/* Active orders */}
+            <div>
+              <div className="flex items-center justify-between mb-3 px-1">
+                <span className="text-sm font-semibold text-gray-700">
+                  {statusFilter && statusFilter !== 'Доставлен' ? statusFilter : 'Активные'}
+                  {whFilter !== 'Все склады' && <span className="text-gray-400 ml-1">· {whFilter}</span>}
+                </span>
+                <span className="text-sm font-bold text-gray-400">{active.length}</span>
+              </div>
+              {active.length === 0 ? (
+                <div className="py-10 text-center text-gray-400 text-sm bg-white rounded-2xl border border-gray-100">
+                  Нет активных поставок
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <AnimatePresence initial={false}>
+                    {active.map((o, i) => renderCard(o, i))}
+                  </AnimatePresence>
+                </div>
+              )}
+            </div>
+
+            {/* Delivered — collapsible */}
+            {(delivered.length > 0 || statusFilter === 'Доставлен') && (
+              <div className="rounded-2xl overflow-hidden border border-emerald-100"
+                style={{ background: 'white' }}>
+                <button
+                  onClick={() => setDeliveredOpen(v => !v)}
+                  className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-emerald-50 transition-colors"
+                  style={{ background: deliveredOpen ? '#f0fdf4' : 'white' }}>
+                  <div className="flex items-center gap-2.5">
+                    <span style={{ width:8, height:8, borderRadius:'50%', background:'#22c55e', flexShrink:0,
+                      boxShadow:'0 0 6px #22c55e88' }} />
+                    <span className="text-sm font-semibold text-gray-700">Доставлено</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                      style={{ background:'#dcfce7', color:'#15803d' }}>{delivered.length}</span>
+                  </div>
+                  <motion.span animate={{ rotate: deliveredOpen ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}>
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d="M2 5l5 5 5-5" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </motion.span>
+                </button>
+                <AnimatePresence initial={false}>
+                  {deliveredOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.22, ease: 'easeInOut' }}
+                      style={{ overflow: 'hidden' }}>
+                      <div className="p-3 space-y-2 border-t border-emerald-50">
+                        {delivered.map((o, i) => renderCard(o, i))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        );
+      })()}
 
       {/* Create modal */}
       {showCreate && canCreate && (

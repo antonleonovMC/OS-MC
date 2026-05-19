@@ -96,7 +96,7 @@ export default function Feedback({ user }) {
     setSending(true);
     try {
       const payload = {
-        date:     new Date().toLocaleString('ru-RU'),
+        date:     new Date().toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' }),
         user:     user?.name || '—',
         role:     user?.role || '—',
         type:     selectedType?.label,

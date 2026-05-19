@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { TrendingUp, TrendingDown, Package, ClipboardList, Coffee, Truck } from 'lucide-react';
 import { SALES } from '../data/constants';
@@ -69,6 +69,130 @@ function toISO(d) {
   return s;
 }
 
+const SPREAD = { usd: 2.5, eur: 3.0, rub: 0.08 };
+
+function useCurrencyRates() {
+  const [rates,   setRates]   = useState(null);
+  const [yesterday, setYesterday] = useState(null);
+  const [updated, setUpdated] = useState('');
+
+  useEffect(() => {
+    const now     = Date.now();
+    const HOUR    = 60 * 60 * 1000;
+    const today   = new Date().toISOString().slice(0, 10);
+    const yesterd = new Date(now - 86400000).toISOString().slice(0, 10);
+
+    // загружаем вчерашний снимок если есть
+    const ySnap = localStorage.getItem(`mc_rates_${yesterd}`);
+    if (ySnap) setYesterday(JSON.parse(ySnap).rates);
+
+    // сегодняшний снимок
+    const stored = localStorage.getItem(`mc_rates_${today}`);
+    const snap   = stored ? JSON.parse(stored) : null;
+    if (snap) {
+      setRates(snap.rates);
+      setUpdated(snap.updated);
+      if (now - snap.ts < HOUR) return; // свежий — не перезапрашиваем
+    }
+
+    fetch('https://open.er-api.com/v6/latest/USD')
+      .then(r => r.json())
+      .then(d => {
+        const mid = {
+          usd: d.rates?.KZT,
+          eur: d.rates?.KZT / d.rates?.EUR,
+          rub: d.rates?.KZT / d.rates?.RUB,
+        };
+        const upd = new Date().toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
+        setRates(mid);
+        setUpdated(upd);
+        localStorage.setItem(`mc_rates_${today}`, JSON.stringify({ rates: mid, updated: upd, ts: now }));
+      })
+      .catch(() => {});
+  }, []);
+
+  return { rates, yesterday, updated };
+}
+
+function CurrencyWidget() {
+  const { rates, yesterday, updated } = useCurrencyRates();
+
+  const items = [
+    { code:'usd', label:'Доллар', sign:'$' },
+    { code:'eur', label:'Евро',   sign:'€' },
+    { code:'rub', label:'Рубль',  sign:'₽' },
+  ];
+
+  const fmt2 = v => v != null
+    ? v.toLocaleString('ru-RU', { minimumFractionDigits:2, maximumFractionDigits:2 })
+    : '—';
+
+  return (
+    <div style={{ background:'white', borderRadius:20, border:'1px solid #e8f4f6',
+      boxShadow:'0 2px 12px rgba(40,121,141,0.07)', padding:'14px 18px' }}>
+
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+        <div>
+          <span style={{ fontSize:13, fontWeight:600, color:'#1a3a42' }}>Курс валют</span>
+          <span style={{ fontSize:10, color:'#94a3b8', marginLeft:8 }}>продажа / покупка · ₸</span>
+        </div>
+        <span style={{ fontSize:10, color:'#b0c4cc' }}>{updated ? `обновлено ${updated}` : '…'}</span>
+      </div>
+
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
+        {items.map(({ code, label, sign }) => {
+          const mid  = rates?.[code];
+          const sp   = SPREAD[code];
+          const sell = mid ? mid + sp : null; // продажа банком (ты покупаешь валюту) — вверху, жирный
+          const buy  = mid ? mid - sp : null; // покупка банком (ты продаёшь валюту) — внизу, тонкий
+          const midY = yesterday?.[code];
+          const diff = (mid && midY) ? +(mid - midY).toFixed(2) : null;
+          const up   = diff > 0;
+
+          return (
+            <div key={code} style={{ background:'#f4f8f9', borderRadius:14, padding:'10px 12px' }}>
+
+              {/* Заголовок + бейдж изменения за час */}
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:7 }}>
+                <span style={{ fontSize:10, color:'#94a3b8' }}>{sign} {label}</span>
+              </div>
+
+              {/* Продажа — жирный (ты конвертируешь тенге → валюту) */}
+              <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', marginBottom:4 }}>
+                <div style={{ display:'flex', alignItems:'baseline', gap:4 }}>
+                  <span style={{ fontSize:9, color:'#94a3b8', width:26 }}>прод</span>
+                  <span style={{ fontSize:18, fontWeight:800, color:'#1a3a42', lineHeight:1 }}>
+                    {fmt2(sell)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Покупка — тонкий */}
+              <div style={{ display:'flex', alignItems:'baseline', gap:4, marginBottom:8 }}>
+                <span style={{ fontSize:9, color:'#94a3b8', width:26 }}>куп</span>
+                <span style={{ fontSize:13, fontWeight:300, color:'#94a3b8', lineHeight:1 }}>
+                  {fmt2(buy)}
+                </span>
+              </div>
+
+              {/* Сравнение с вчера */}
+              {diff !== null ? (
+                <div style={{ fontSize:10, fontWeight:500, display:'flex', alignItems:'center', gap:4,
+                  color: up ? '#059669' : '#e11d48' }}>
+                  <span>{up ? '▲' : '▼'}</span>
+                  <span>{up ? '+' : ''}{fmt2(diff)} ₸ за день</span>
+                </div>
+              ) : (
+                <div style={{ fontSize:10, color:'#cbd5e1' }}>нет данных за вчера</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const TREND = [
   { d:"01", c:420, p:380 }, { d:"05", c:510, p:430 }, { d:"09", c:480, p:460 },
   { d:"13", c:630, p:490 }, { d:"17", c:710, p:530 }, { d:"21", c:680, p:570 },
@@ -91,23 +215,39 @@ const Tip = ({ active, payload, label }) => {
   );
 };
 
-function Stat({ icon: Icon, label, value, delta, onClick }) {
+function Stat({ icon: Icon, label, value, delta, onClick, tint = BRAND }) {
   const up = delta >= 0;
+  const tintBg  = tint + '18'; // ~10% opacity
+  const tintMid = tint + '28';
   return (
     <button onClick={onClick} disabled={!onClick}
       className="text-left"
-      style={{ background:'white', borderRadius:16, padding:'14px 16px', border:'1px solid #e8f4f6',
-        boxShadow:'0 1px 6px rgba(40,121,141,0.05)', cursor: onClick ? 'pointer' : 'default',
-        transition:'box-shadow .15s' }}
-      onMouseEnter={e => onClick && (e.currentTarget.style.boxShadow='0 4px 16px rgba(40,121,141,0.13)')}
-      onMouseLeave={e => onClick && (e.currentTarget.style.boxShadow='0 1px 6px rgba(40,121,141,0.05)')}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-        <div style={{ width:32, height:32, borderRadius:10, background:BRAND_LT,
-          display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <Icon size={15} color={BRAND} />
+      style={{
+        background: `linear-gradient(145deg, white 0%, ${tintBg} 100%)`,
+        borderRadius: 20,
+        padding: '16px 18px',
+        border: `1px solid ${tint}22`,
+        boxShadow: `0 2px 10px ${tint}14, 0 1px 3px rgba(0,0,0,0.04)`,
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'box-shadow .2s, transform .15s',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+      onMouseEnter={e => { if(onClick){ e.currentTarget.style.boxShadow=`0 8px 24px ${tint}28, 0 2px 8px rgba(0,0,0,0.06)`; e.currentTarget.style.transform='translateY(-1px)'; }}}
+      onMouseLeave={e => { if(onClick){ e.currentTarget.style.boxShadow=`0 2px 10px ${tint}14, 0 1px 3px rgba(0,0,0,0.04)`; e.currentTarget.style.transform='translateY(0)'; }}}>
+      {/* Subtle corner glow */}
+      <div style={{ position:'absolute', top:-20, right:-20, width:70, height:70,
+        borderRadius:'50%', background: `radial-gradient(circle, ${tintMid} 0%, transparent 70%)`,
+        pointerEvents:'none' }} />
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+        <div style={{ width:36, height:36, borderRadius:12,
+          background: `linear-gradient(135deg, ${tintBg}, ${tintMid})`,
+          display:'flex', alignItems:'center', justifyContent:'center',
+          boxShadow: `0 2px 8px ${tint}30` }}>
+          <Icon size={16} color={tint} />
         </div>
         {delta !== undefined && (
-          <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:20,
+          <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:20,
             background: up ? '#ecfdf5' : '#fff1f2', color: up ? '#059669' : '#e11d48',
             display:'flex', alignItems:'center', gap:3 }}>
             {up ? <TrendingUp size={9}/> : <TrendingDown size={9}/>}
@@ -115,8 +255,8 @@ function Stat({ icon: Icon, label, value, delta, onClick }) {
           </span>
         )}
       </div>
-      <div style={{ fontSize:22, fontWeight:800, color:'#1a3a42', lineHeight:1 }}>{value}</div>
-      <div style={{ fontSize:11, color:'#94a3b8', marginTop:4 }}>{label}</div>
+      <div style={{ fontSize:26, fontWeight:800, color:'#1a3a42', lineHeight:1, letterSpacing:'-0.5px' }}>{value}</div>
+      <div style={{ fontSize:11, color:'#7a9aaa', marginTop:5, fontWeight:500 }}>{label}</div>
     </button>
   );
 }
@@ -183,12 +323,15 @@ export default function Dashboard({ setPage }) {
       <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:10 }}
         className="sm:grid-cols-4" >
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 col-span-2 sm:col-span-4">
-          <Stat icon={Truck}        label="Активных поставок"  value={active.length}        delta={12}    onClick={()=>setPage("logistics")} />
-          <Stat icon={ClipboardList} label="Заявок ожидает"    value={pReqs.length}         delta={-5}    onClick={()=>setPage("requests")}  />
-          <Stat icon={TrendingUp}   label="Продано позиций"    value={sold.toLocaleString('ru')} delta={delta} />
-          <Stat icon={Coffee}       label="Кофе-заказов"       value={pCoff.length}         delta={0}     onClick={()=>setPage("coffee")}    />
+          <Stat icon={Truck}        label="Активных поставок"  value={active.length}        delta={12}    onClick={()=>setPage("logistics")} tint="#28798d" />
+          <Stat icon={ClipboardList} label="Заявок ожидает"   value={pReqs.length}         delta={-5}    onClick={()=>setPage("requests")}  tint="#f59e0b" />
+          <Stat icon={TrendingUp}   label="Продано позиций"    value={sold.toLocaleString('ru')} delta={delta}                           tint="#10b981" />
+          <Stat icon={Coffee}       label="Кофе-заказов"       value={pCoff.length}         delta={0}     onClick={()=>setPage("coffee")}    tint="#8b5cf6" />
         </div>
       </div>
+
+      {/* ── Курс валют ── */}
+      <CurrencyWidget />
 
       {/* ── Chart card with filters inside ── */}
       <div style={{ background:'white', borderRadius:20, border:'1px solid #e8f4f6',

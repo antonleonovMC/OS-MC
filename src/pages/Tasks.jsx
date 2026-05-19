@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { USERS, ROLE_LABELS } from '../data/constants';
+import { fmtDate } from '../lib/fmt';
 import { useData } from '../context/DataContext';
 
 const BRAND = '#28798d';
@@ -64,7 +65,7 @@ function TaskCard({ task, compact, setModal }) {
         <PBadge p={task.priority} />
       </div>
       <div style={{ display:'flex', alignItems:'center', gap:10, fontSize:11, color:'#94a3b8' }}>
-        {task.due && task.due !== '—' && <span>📅 {task.due}</span>}
+        {task.due && task.due !== '—' && <span>📅 {fmtDate(task.due)}</span>}
         {unread > 0 && (
           <span style={{ marginLeft:'auto', fontSize:10, fontWeight:600, color:'#f59e0b',
             background:'#fffbeb', padding:'1px 6px', borderRadius:20 }}>💬 {unread}</span>
@@ -292,7 +293,7 @@ function TaskModal({ modal, setModal, comment, setComment, tag, setTag, fileRef,
                 value={modal.due && modal.due !== '—' ? (modal.due.includes('.') ? modal.due.split('.').reverse().join('-') : modal.due) : ''}
                 onChange={e => {
                   const d = e.target.value;
-                  const fmt = d ? new Date(d).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+                  const fmt = d ? new Date(d).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}) : '—';
                   changeDate(modal.id, fmt);
                 }}
                 style={{ ...INP, fontSize:12 }}/>

@@ -35,21 +35,11 @@ const PAGE_META = {
 const PAGE_ORDER = ['dashboard','logistics','requests','coffee','payments','tasks','staff','feedback'];
 
 // Десктоп: вертикальный fade. Мобильный: горизонтальный слайд
-const makeVariants = (dir) => {
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
-  if (!isMobile) return {
-    initial: { opacity:0, y:10 },
-    animate: { opacity:1, y:0,  transition:{ duration:0.2, ease:'easeOut' } },
-    exit:    { opacity:0, y:-6, transition:{ duration:0.14, ease:'easeIn' } },
-  };
-  const x = dir > 0 ? '55%' : '-55%';
-  const xExit = dir > 0 ? '-30%' : '30%';
-  return {
-    initial: { opacity:0, x },
-    animate: { opacity:1, x:0, transition:{ duration:0.26, ease:[0.25,0.46,0.45,0.94] } },
-    exit:    { opacity:0, x:xExit, transition:{ duration:0.18, ease:'easeIn' } },
-  };
-};
+const makeVariants = () => ({
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.14, ease: 'easeOut' } },
+  exit:    { opacity: 0, transition: { duration: 0.08, ease: 'easeIn' } },
+});
 
 // ── Loading screen while Sheets data is fetching ───────────────────────────
 function DataLoader() {
@@ -125,7 +115,13 @@ function Inner() {
       status: 'Принят',
       country: 'РК',
       comment: req.comment || '',
-      items: [{ name: req.product || '—', qty: req.qty || '', unit: 'шт' }],
+      items: (() => {
+        const parsed = (req.product || '').split(';').map(s => {
+          const [name, qty] = s.split(':');
+          return { name: (name || '').trim(), qty: (qty || '').trim(), unit: 'шт' };
+        }).filter(i => i.name);
+        return parsed.length ? parsed : [{ name: req.product || '—', qty: req.qty || '', unit: 'шт' }];
+      })(),
       created: today,
       history: advanceHistory([], 'Принят'),
       payments: [],
@@ -136,7 +132,7 @@ function Inner() {
   };
 
   return (
-    <div className="flex min-h-screen" style={{ background:'#f4f8f9' }}>
+    <div className="flex min-h-screen mc-bg-shimmer">
       <Toaster position="top-right" richColors closeButton />
 
       {/* Desktop sidebar */}
@@ -165,7 +161,14 @@ function Inner() {
       {/* Main */}
       <div className="flex-1 flex flex-col min-h-screen lg:ml-52">
         <header className="px-4 lg:px-7 flex items-center justify-between sticky top-0 z-20"
-          style={{ height:52, background:'rgba(244,248,249,0.92)', backdropFilter:'blur(12px)' }}>
+          style={{
+            height: 52,
+            background: 'rgba(255,255,255,0.72)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            borderBottom: '1px solid rgba(40,121,141,0.10)',
+            boxShadow: '0 1px 20px rgba(40,121,141,0.08), 0 1px 4px rgba(0,0,0,0.04)',
+          }}>
           <div className="flex items-center gap-2.5">
             <button className="lg:hidden w-7 h-7 flex items-center justify-center rounded-xl hover:bg-black/5 transition-colors"
               onClick={() => setSidebarOpen(true)}>
@@ -265,7 +268,7 @@ function Inner() {
           </div>
         )}
 
-        <main className="flex-1 px-3 sm:px-4 lg:px-6 overflow-auto lg:pb-6 pb-24" style={{ paddingTop:8 }}>
+        <main className="flex-1 px-3 sm:px-4 lg:px-6 overflow-x-hidden overflow-y-auto lg:pb-6 pb-24" style={{ paddingTop:8 }}>
           {!access.includes(page) ? (
             <div className="flex items-center justify-center h-64 flex-col gap-3">
               <div className="text-5xl">🔒</div>
@@ -274,7 +277,7 @@ function Inner() {
             </div>
           ) : (
             <AnimatePresence mode="wait">
-              <motion.div key={page} {...makeVariants(navDir)} style={{ overflow: 'hidden' }}>
+              <motion.div key={page} {...makeVariants()} style={{ overflow: 'hidden' }}>
                 {page === 'dashboard' && <Dashboard setPage={safePage} />}
                 {page === 'logistics' && <Logistics user={effectiveUser} />}
                 {page === 'requests'  && <Requests  user={effectiveUser} sidebarOpen={sidebarOpen} onCreateLogisticsOrder={handleCreateLogisticsOrder} />}
