@@ -630,16 +630,60 @@ export default function Payments({ user }) {
       {/* Success overlay */}
       <AnimatePresence>
         {submitted && (
-          <motion.div className="fixed inset-0 z-[60] flex items-center justify-center"
+          <motion.div className="fixed inset-0 z-[60] flex items-end justify-center"
             initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-            style={{background:'rgba(0,0,0,0.45)',backdropFilter:'blur(4px)'}}>
-            <motion.div initial={{scale:0.85,opacity:0}} animate={{scale:1,opacity:1}} exit={{scale:0.85,opacity:0}}
-              transition={{duration:0.18,ease:"easeOut"}}
-              style={{background:'white',borderRadius:24,padding:'44px 40px',textAlign:'center',minWidth:260}}>
-              <motion.div initial={{scale:0}} animate={{scale:1}} transition={{duration:0.15,ease:"easeOut"}}
-                style={{fontSize:52,marginBottom:14}}>✅</motion.div>
-              <div style={{fontSize:18,fontWeight:800,color:DARK,marginBottom:6}}>Заявка отправлена!</div>
-              <div style={{fontSize:13,color:'#6b7280'}}>Ожидайте подтверждения</div>
+            style={{background:'rgba(0,0,0,0.35)',backdropFilter:'blur(6px)'}}
+            onClick={() => setSubmitted(false)}>
+            <motion.div
+              initial={{y:80,opacity:0}} animate={{y:0,opacity:1}} exit={{y:80,opacity:0}}
+              transition={{duration:0.22,ease:'easeOut'}}
+              onClick={e => e.stopPropagation()}
+              style={{
+                background:'white', borderRadius:'28px 28px 0 0',
+                padding:'36px 32px 40px', textAlign:'center',
+                width:'100%', maxWidth:480,
+              }}>
+
+              {/* Бейдж с галочкой */}
+              <motion.div
+                initial={{scale:0, rotate:-20}} animate={{scale:1, rotate:0}}
+                transition={{delay:0.1, type:'spring', stiffness:300, damping:20}}
+                style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', marginBottom:22 }}>
+                <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+                  {/* Фон бейджа */}
+                  <path d="M40 4l5.9 3.4 6.7-.4 3.4 5.9 5.9 3.4-.4 6.7L65 29l-3.4 5.9.4 6.7-5.9 3.4L52.7 51l-6.7.4L40 55l-5.9-3.4-6.7.4-3.4-5.9-5.9-3.4.4-6.7L15 29l3.4-5.9-.4-6.7 5.9-3.4L27.3 7l6.7-.4L40 4z"
+                    fill="#d1fae5"/>
+                  <path d="M40 4l5.9 3.4 6.7-.4 3.4 5.9 5.9 3.4-.4 6.7L65 29l-3.4 5.9.4 6.7-5.9 3.4L52.7 51l-6.7.4L40 55l-5.9-3.4-6.7.4-3.4-5.9-5.9-3.4.4-6.7L15 29l3.4-5.9-.4-6.7 5.9-3.4L27.3 7l6.7-.4L40 4z"
+                    fill="none" stroke="#6ee7b7" strokeWidth="1.5"/>
+                  {/* Галочка — анимированная */}
+                  <motion.path
+                    d="M27 30l9 9 17-16"
+                    stroke="#059669" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"
+                    fill="none"
+                    initial={{pathLength:0}} animate={{pathLength:1}}
+                    transition={{delay:0.3, duration:0.4, ease:'easeOut'}}/>
+                </svg>
+              </motion.div>
+
+              <motion.div
+                initial={{opacity:0,y:8}} animate={{opacity:1,y:0}}
+                transition={{delay:0.25, duration:0.2}}>
+                <div style={{fontSize:22,fontWeight:800,color:'#1a3a42',marginBottom:8}}>
+                  Успешно отправлено
+                </div>
+                <div style={{fontSize:14,color:'#94a3b8',marginBottom:32,lineHeight:1.5}}>
+                  Ваша заявка успешно отправлена.<br/>Ожидайте подтверждения.
+                </div>
+                <button
+                  onClick={() => setSubmitted(false)}
+                  style={{
+                    width:'100%', padding:'15px 0', borderRadius:16,
+                    background:'#1a3a42', color:'white',
+                    fontSize:15, fontWeight:700, border:'none', cursor:'pointer',
+                  }}>
+                  Готово
+                </button>
+              </motion.div>
             </motion.div>
           </motion.div>
         )}

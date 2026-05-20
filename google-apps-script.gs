@@ -542,6 +542,9 @@ function doPost(e) {
       return json({ ok: true, action: 'notify', sent });
     }
 
+    if (action === 'uploadFile') return handleUploadFile(data);
+    if (action === 'addPayment') return handleAddPayment(data);
+
     const sheet = SS.getSheetByName(sheetName);
     if (!sheet) return json({ error: 'Лист не найден: ' + sheetName });
 
@@ -663,4 +666,82 @@ function json(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ЗАЯВКИ НА ОПЛАТУ — MC OS → Google Таблица
+//  Поиск колонок по заголовку, не по номеру.
+//  Переставляй столбцы как угодно — всё попадёт правильно.
+// ═══════════════════════════════════════════════════════════
+
+// Маппинг: поле из формы → точный заголовок в таблице
+const PAYMENT_MAP = {
+  created:               'Отметка времени',
+  dept:                  'Подразделение',
+  requester:             'Должность и ФИО',
+  due_date:              'Дата оплаты',
+  amount:                'Сумма оплаты',
+  recipient:             'Наименование поставщика',
+  category:              'Статья расходов',
+  purpose:               'Назначение платежа',
+  basis_file_url:        'Основание для оплаты',
+  legal_entity:          'Компания',
+  supplier_mode:         'Режим поставщика',
+  supplier_contact:      'Контакты поставщика',
+  contract_url:          'Договор',
+  comment:               'Комментарий',
+  email:                 'Адрес электронной почты',
+  status:                'Статус оплаты',
+};
+
+function handleAddPayment(data) {
+  // Ищем лист с заявками на оплату (Form_Responses или Счета)
+  const sheet = SS.getSheetByName('Form_Responses')
+    || SS.getSheetByName('Form Responses 1')
+    || SS.getSheetByName('Счета')
+    || SS.getSheets()[0];
+
+  if (!sheet) return json({ error: 'Лист для оплат не найден' });
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  // Склеиваем контакт поставщика из отдельных полей
+  const contactParts = [
+    data.supplier_contact_role,
+    data.supplier_contact_name,
+    data.supplier_contact_phone,
+  ].filter(Boolean);
+  data.supplier_contact = contactParts.join(', ');
+
+  // Строим строку по заголовкам — пустая строка если заголовок не найден
+  const row = headers.map(function(header) {
+    for (var field in PAYMENT_MAP) {
+      if (PAYMENT_MAP[field] === header) {
+        return data[field] !== undefined ? data[field] : '';
+      }
+    }
+    return '';
+  });
+
+  sheet.appendRow(row);
+  Logger.log('✅ Заявка на оплату добавлена: ' + (data.recipient || '—') + ' ' + (data.amount || '') + ' ₸');
+  return json({ ok: true, action: 'addPayment' });
+}
+
+function handleUploadFile(data) {
+  const folderName = 'MC OS — Основания оплат';
+  var folder;
+  var folders = DriveApp.getFoldersByName(folderName);
+  folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+
+  var blob = Utilities.newBlob(
+    Utilities.base64Decode(data.base64),
+    data.mimeType,
+    data.name
+  );
+  var file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  Logger.log('✅ Файл загружен: ' + data.name + ' → ' + file.getUrl());
+  return json({ ok: true, url: file.getUrl(), name: data.name });
 }
