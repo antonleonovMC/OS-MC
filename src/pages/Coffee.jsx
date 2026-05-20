@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import DatePicker from '../components/DatePicker';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
 import { fmtDate } from '../lib/fmt';
@@ -500,13 +501,10 @@ export default function Coffee({ user }) {
                 {/* Желаемая дата получения */}
                 <div>
                   <FieldLabel>Желаемая дата получения</FieldLabel>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={newDeliveryDate}
-                    onChange={e => setNewDeliveryDate(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
-                    style={{ width:'100%', padding:'9px 12px', border:'1px solid #e2e8f0', borderRadius:12,
-                      fontSize:13, outline:'none', boxSizing:'border-box', color:'#1a3a42' }}
+                    onChange={v => setNewDeliveryDate(v)}
+                    style={{ padding:'9px 12px', border:'1px solid #e2e8f0', borderRadius:12, fontSize:13 }}
                   />
                 </div>
 

@@ -145,14 +145,16 @@ export function DataProvider({ children, onReady }) {
     const poll = setInterval(async () => {
       if (!sheetsReady()) return;
       try {
-        const [ordersRaw, reqRaw, cofRaw] = await Promise.all([
+        const [ordersRaw, reqRaw, cofRaw, payReqRaw] = await Promise.all([
           fetchSheet('Заказы'), fetchSheet('Заявки'), fetchSheet('Кофе'),
+          fetchSheet('Заявки на оплату').catch(() => []),
         ]);
         setOrders(ordersRaw.map(mapOrder));
         setRequests(reqRaw.map(mapRequest));
         setCoffees(cofRaw.map(mapCoffee));
+        setPaymentRequests(payReqRaw.map(r => ({ ...r, amount: Number(r.amount) || 0 })));
       } catch {}
-    }, 30000);
+    }, 15000);
     return () => clearInterval(poll);
   }, []);
 

@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import DatePicker from '../components/DatePicker';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { USERS, ROLE_LABELS } from '../data/constants';
@@ -208,8 +209,7 @@ function CreateModal({ createCol, setCreateCol, form, setForm, createTask }) {
                 <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                   <div>
                     <FieldLabel>Срок</FieldLabel>
-                    <input type="date" value={form.due} onChange={e => setForm({...form, due:e.target.value})}
-                      style={INP}/>
+                    <DatePicker value={form.due} onChange={v => setForm({...form, due:v})} style={INP}/>
                   </div>
                   <div>
                     <FieldLabel>Исполнитель</FieldLabel>
@@ -289,11 +289,10 @@ function TaskModal({ modal, setModal, comment, setComment, tag, setTag, fileRef,
           <div style={{ padding:'12px 20px', borderBottom:'1px solid #f1f5f9', display:'flex', gap:12, flexWrap:'wrap' }}>
             <div style={{ flex:1, minWidth:140 }}>
               <FieldLabel>Срок выполнения</FieldLabel>
-              <input type="date"
+              <DatePicker
                 value={modal.due && modal.due !== '—' ? (modal.due.includes('.') ? modal.due.split('.').reverse().join('-') : modal.due) : ''}
-                onChange={e => {
-                  const d = e.target.value;
-                  const fmt = d ? new Date(d).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}) : '—';
+                onChange={v => {
+                  const fmt = v ? new Date(v).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}) : '—';
                   changeDate(modal.id, fmt);
                 }}
                 style={{ ...INP, fontSize:12 }}/>

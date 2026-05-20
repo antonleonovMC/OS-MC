@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import DatePicker from '../components/DatePicker';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
@@ -665,9 +666,9 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
               </>}
               {step===4&&<>
                 <FormField label={<span>Срок поставки <span className="text-red-500">*</span></span>}>
-                  <input type="date" value={form.deliveryDate} onChange={e => set('deliveryDate', e.target.value)}
-                    className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 ${!form.deliveryDate.trim() ? 'border-red-200 bg-red-50' : 'border-gray-200'}`}
-                    style={{'--tw-ring-color': BRAND}}/>
+                  <DatePicker value={form.deliveryDate} onChange={v => set('deliveryDate', v)}
+                    style={{ borderColor: !form.deliveryDate ? '#fca5a5' : '#e5e7eb',
+                      background: !form.deliveryDate ? '#fef2f2' : 'white' }}/>
                   {!form.deliveryDate.trim() && <p className="text-xs text-red-500 mt-1">Обязательное поле</p>}
                 </FormField>
                 <FormField label={<span>Адрес доставки <span className="text-red-500">*</span></span>}>
@@ -715,7 +716,7 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
               {step===5&&<><FormField label="Компания поставщика">{I("supplierCompany","Название")}</FormField><FormField label="Контактное лицо">{I("supplierPerson","Имя")}</FormField><FormField label="Телефон">{I("supplierPhone","+7 …")}</FormField></>}
               {step===6&&<div className="space-y-3">
                 <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
-                  {[["Категория",form.category==='Другое'?(form.categoryOther||'Другое'):form.category],["Срочность",form.urgency],["Подразделение",form.dept],["Бюдж. подразделение",form.budgetDept],["Юр. лицо",form.legalEntity],["Адрес доставки",form.address],["Контакт",form.contact],["Поставщик",form.supplierCompany]].filter(([,v])=>v).map(([l,v])=>(
+                  {[["Категория",form.category==='Другое'?(form.categoryOther||'Другое'):form.category],["Срочность",form.urgency],["Срок поставки",fmtDate(form.deliveryDate)],["Подразделение",form.dept],["Бюдж. подразделение",form.budgetDept],["Юр. лицо",form.legalEntity],["Адрес доставки",form.address],["Контакт",form.contact],["Поставщик",form.supplierCompany]].filter(([,v])=>v).map(([l,v])=>(
                     <div key={l} className="flex justify-between gap-4"><span className="text-gray-500 flex-shrink-0">{l}</span><span className="font-medium text-gray-800 text-right">{v}</span></div>
                   ))}
                 </div>

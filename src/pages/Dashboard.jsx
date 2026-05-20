@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import DatePicker from '../components/DatePicker';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { TrendingUp, TrendingDown, Package, ClipboardList, Coffee, Truck } from 'lucide-react';
 import { SALES } from '../data/constants';
@@ -19,13 +20,13 @@ function Filters({ from, to, setFrom, setTo, city, setCity, group, setGroup, cit
       <div style={{ display:'flex', alignItems:'center', gap:8 }}>
         <span style={{ fontSize:11, color:'#94a3b8', width:52, flexShrink:0 }}>Период</span>
         <div style={{ display:'flex', alignItems:'center', gap:6, flex:1 }}>
-          <input type="date" value={from} onChange={e=>setFrom(e.target.value)}
+          <DatePicker value={from} onChange={v=>setFrom(v)}
             style={{ flex:1, minWidth:0, padding:'6px 10px', background:'#f4f8f9', border:'1px solid #d0eaee',
-              borderRadius:10, fontSize:11, outline:'none', color:'#1a3a42' }}/>
+              borderRadius:10, fontSize:11 }}/>
           <span style={{ color:'#cbd5e1', fontSize:11 }}>—</span>
-          <input type="date" value={to} onChange={e=>setTo(e.target.value)}
+          <DatePicker value={to} onChange={v=>setTo(v)}
             style={{ flex:1, minWidth:0, padding:'6px 10px', background:'#f4f8f9', border:'1px solid #d0eaee',
-              borderRadius:10, fontSize:11, outline:'none', color:'#1a3a42' }}/>
+              borderRadius:10, fontSize:11 }}/>
         </div>
       </div>
       {/* Город */}
@@ -69,58 +70,47 @@ function toISO(d) {
   return s;
 }
 
-const SPREAD = { usd: 2.5, eur: 3.0, rub: 0.08 };
 
 function useCurrencyRates() {
   const [rates,   setRates]   = useState(null);
-  const [yesterday, setYesterday] = useState(null);
   const [updated, setUpdated] = useState('');
 
   useEffect(() => {
-    const now     = Date.now();
-    const HOUR    = 60 * 60 * 1000;
-    const today   = new Date().toISOString().slice(0, 10);
-    const yesterd = new Date(now - 86400000).toISOString().slice(0, 10);
+    const HOUR  = 60 * 60 * 1000;
+    const today = new Date().toISOString().slice(0, 10);
 
-    // загружаем вчерашний снимок если есть
-    const ySnap = localStorage.getItem(`mc_rates_${yesterd}`);
-    if (ySnap) setYesterday(JSON.parse(ySnap).rates);
-
-    // сегодняшний снимок
-    const stored = localStorage.getItem(`mc_rates_${today}`);
+    const CACHE_KEY = `mc_rates_v2_${today}`;
+    const stored = localStorage.getItem(CACHE_KEY);
     const snap   = stored ? JSON.parse(stored) : null;
     if (snap) {
       setRates(snap.rates);
       setUpdated(snap.updated);
-      if (now - snap.ts < HOUR) return; // свежий — не перезапрашиваем
+      if (Date.now() - snap.ts < HOUR) return;
     }
 
-    fetch('https://open.er-api.com/v6/latest/USD')
+    fetch('/api/rates')
       .then(r => r.json())
       .then(d => {
-        const mid = {
-          usd: d.rates?.KZT,
-          eur: d.rates?.KZT / d.rates?.EUR,
-          rub: d.rates?.KZT / d.rates?.RUB,
-        };
+        if (!d.rates || !Object.keys(d.rates).length) return;
         const upd = new Date().toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
-        setRates(mid);
+        setRates(d.rates);
         setUpdated(upd);
-        localStorage.setItem(`mc_rates_${today}`, JSON.stringify({ rates: mid, updated: upd, ts: now }));
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ rates: d.rates, updated: upd, ts: Date.now() }));
       })
       .catch(() => {});
   }, []);
 
-  return { rates, yesterday, updated };
+  return { rates, updated };
 }
 
 function CurrencyWidget() {
-  const { rates, yesterday, updated } = useCurrencyRates();
+  const { rates, updated } = useCurrencyRates();
 
   const items = [
-    { code:'usd', label:'Доллар', sign:'$' },
-    { code:'eur', label:'Евро',   sign:'€' },
-    { code:'rub', label:'Рубль',  sign:'₽' },
+    { code:'USD', label:'Доллар', sign:'$' },
+    { code:'EUR', label:'Евро',   sign:'€' },
+    { code:'CNY', label:'Юань',   sign:'¥' },
+    { code:'RUB', label:'Рубль',  sign:'₽' },
   ];
 
   const fmt2 = v => v != null
@@ -134,56 +124,39 @@ function CurrencyWidget() {
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
         <div>
           <span style={{ fontSize:13, fontWeight:600, color:'#1a3a42' }}>Курс валют</span>
-          <span style={{ fontSize:10, color:'#94a3b8', marginLeft:8 }}>продажа / покупка · ₸</span>
+          <span style={{ fontSize:10, color:'#94a3b8', marginLeft:8 }}>официальный курс НБ РК · ₸</span>
         </div>
-        <span style={{ fontSize:10, color:'#b0c4cc' }}>{updated ? `обновлено ${updated}` : '…'}</span>
+        <span style={{ fontSize:10, color:'#b0c4cc' }}>
+          {updated ? `обновлено ${updated}` : rates === null ? '…' : 'ошибка загрузки'}
+        </span>
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
+      <div className="grid grid-cols-2 sm:grid-cols-4" style={{ gap:8 }}>
         {items.map(({ code, label, sign }) => {
-          const mid  = rates?.[code];
-          const sp   = SPREAD[code];
-          const sell = mid ? mid + sp : null; // продажа банком (ты покупаешь валюту) — вверху, жирный
-          const buy  = mid ? mid - sp : null; // покупка банком (ты продаёшь валюту) — внизу, тонкий
-          const midY = yesterday?.[code];
-          const diff = (mid && midY) ? +(mid - midY).toFixed(2) : null;
-          const up   = diff > 0;
+          const entry = rates?.[code];
+          const rate  = entry?.rate ?? null;
+          const diff  = entry?.change ?? null;
+          const up    = diff > 0;
 
           return (
             <div key={code} style={{ background:'#f4f8f9', borderRadius:14, padding:'10px 12px' }}>
 
-              {/* Заголовок + бейдж изменения за час */}
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:7 }}>
-                <span style={{ fontSize:10, color:'#94a3b8' }}>{sign} {label}</span>
+              <div style={{ fontSize:10, color:'#94a3b8', marginBottom:8 }}>{sign} {label}</div>
+
+              {/* Официальный курс */}
+              <div style={{ fontSize:20, fontWeight:800, color:'#1a3a42', lineHeight:1, marginBottom:8 }}>
+                {fmt2(rate)}
               </div>
 
-              {/* Продажа — жирный (ты конвертируешь тенге → валюту) */}
-              <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', marginBottom:4 }}>
-                <div style={{ display:'flex', alignItems:'baseline', gap:4 }}>
-                  <span style={{ fontSize:9, color:'#94a3b8', width:26 }}>прод</span>
-                  <span style={{ fontSize:18, fontWeight:800, color:'#1a3a42', lineHeight:1 }}>
-                    {fmt2(sell)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Покупка — тонкий */}
-              <div style={{ display:'flex', alignItems:'baseline', gap:4, marginBottom:8 }}>
-                <span style={{ fontSize:9, color:'#94a3b8', width:26 }}>куп</span>
-                <span style={{ fontSize:13, fontWeight:300, color:'#94a3b8', lineHeight:1 }}>
-                  {fmt2(buy)}
-                </span>
-              </div>
-
-              {/* Сравнение с вчера */}
-              {diff !== null ? (
-                <div style={{ fontSize:10, fontWeight:500, display:'flex', alignItems:'center', gap:4,
+              {/* Изменение за день */}
+              {diff !== null && diff !== 0 ? (
+                <div style={{ fontSize:10, fontWeight:600, display:'flex', alignItems:'center', gap:3,
                   color: up ? '#059669' : '#e11d48' }}>
                   <span>{up ? '▲' : '▼'}</span>
-                  <span>{up ? '+' : ''}{fmt2(diff)} ₸ за день</span>
+                  <span>{up ? '+' : ''}{fmt2(diff)} ₸</span>
                 </div>
               ) : (
-                <div style={{ fontSize:10, color:'#cbd5e1' }}>нет данных за вчера</div>
+                <div style={{ fontSize:10, color:'#cbd5e1' }}>без изменений</div>
               )}
             </div>
           );

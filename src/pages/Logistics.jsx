@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
+import DatePicker from '../components/DatePicker';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WAREHOUSES, STATUS_FLOW, STATUS_DOT, ROASTERY_WAREHOUSE, genCode, makeHistory, advanceHistory, nowAstanaStr } from '../data/constants';
 import { useData } from '../context/DataContext';
@@ -277,11 +278,10 @@ export default function Logistics({ user }) {
           ))}
           <div>
             <div className="text-xs text-gray-500 mb-1">Дата плана</div>
-            <input type="date"
+            <DatePicker
               value={editData.planDate ? (() => { const d = new Date(editData.planDate); return isNaN(d) ? '' : d.toISOString().slice(0,10); })() : ''}
-              onChange={e => setEditData(p => ({ ...p, planDate: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2"
-              style={{ '--tw-ring-color': BRAND }} />
+              onChange={v => setEditData(p => ({ ...p, planDate: v }))}
+              style={{ padding:'8px 12px', border:'1px solid #e5e7eb', borderRadius:12, fontSize:14 }}/>
           </div>
           <div>
             <div className="text-xs text-gray-500 mb-1">Статус</div>
