@@ -846,45 +846,98 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
         const fmtReqDate = (d) => fmtDate(d) || '';
         const activeReqs   = filtered.filter(r => r.status !== 'Отклонена');
         const rejectedReqs = filtered.filter(r => r.status === 'Отклонена');
-        const renderCard = (r) => (
+        const renderCard = (r) => {
+          const accent = URGENCY_BORDER[r.urgency] || '#e5e7eb';
+          const initials = (r.employee||'').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+          return (
           <motion.div key={r.id}
             initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:0.18}}
             onClick={() => setSelId(r.id)}
-            className="bg-white rounded-2xl border border-gray-100 shadow-sm cursor-pointer active:scale-[0.98] transition-transform w-full"
-            style={{ borderLeft: `4px solid ${URGENCY_BORDER[r.urgency] || '#e5e7eb'}`, boxSizing:'border-box' }}>
-            <div className="flex items-start justify-between gap-2 p-3 pb-2">
-              <div className="min-w-0 flex-1 overflow-hidden">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-xs font-mono text-gray-400 flex-shrink-0">{r.id}</span>
-                  <span className="text-xs text-gray-400 truncate">{r.employee} · {r.dept}</span>
+            style={{
+              background:'white', borderRadius:18,
+              border:'1px solid #f0f4f5',
+              boxShadow:'0 2px 12px rgba(40,121,141,0.07)',
+              overflow:'hidden', cursor:'pointer',
+              boxSizing:'border-box',
+            }}>
+
+            {/* Цветная полоска сверху */}
+            <div style={{ height:3, background:`linear-gradient(90deg, ${accent}, ${accent}55)` }}/>
+
+            {/* Основное содержимое */}
+            <div style={{ padding:'12px 14px 10px', display:'flex', gap:10, alignItems:'flex-start' }}>
+
+              {/* Аватарка сотрудника */}
+              <div style={{
+                width:34, height:34, borderRadius:10, flexShrink:0,
+                background:`${accent}18`, border:`1px solid ${accent}33`,
+                display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:11, fontWeight:800, color:accent, letterSpacing:-.3,
+              }}>{initials || '?'}</div>
+
+              {/* Текст */}
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8, marginBottom:3 }}>
+                  <div style={{ fontWeight:700, fontSize:13, color:'#1a3a42', lineHeight:1.3,
+                    display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
+                    {r.product}
+                  </div>
+                  <div style={{ flexShrink:0, marginTop:1 }}><Badge s={r.status}/></div>
                 </div>
-                <div className="font-semibold text-gray-800 text-sm leading-tight"
-                  style={{ display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
-                  {r.product}
+                <div style={{ fontSize:11, color:'#94a3b8', marginBottom:7 }}>
+                  {r.employee}{r.dept ? ` · ${r.dept}` : ''}
+                </div>
+
+                {/* Теги */}
+                <div style={{ display:'flex', gap:5, flexWrap:'nowrap', overflow:'hidden', alignItems:'center' }}>
+                  {r.category && (
+                    <span style={{ fontSize:10, background:'#f4f8f9', color:'#64748b', padding:'3px 8px',
+                      borderRadius:20, maxWidth:100, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flexShrink:1 }}>
+                      {r.category}
+                    </span>
+                  )}
+                  {r.qty && (
+                    <span style={{ fontSize:10, background:'#f4f8f9', color:'#1a3a42', padding:'3px 8px',
+                      borderRadius:20, fontWeight:600, whiteSpace:'nowrap', flexShrink:0 }}>
+                      {r.qty}
+                    </span>
+                  )}
+                  <span style={{ fontSize:10, padding:'3px 8px', borderRadius:20, fontWeight:600, flexShrink:0,
+                    background:`${accent}15`, color:accent }}>
+                    {r.urgency}
+                  </span>
+                  <span style={{ fontSize:10, color:'#cbd5e1', marginLeft:'auto', whiteSpace:'nowrap', flexShrink:0 }}>
+                    {fmtReqDate(r.date)}
+                  </span>
                 </div>
               </div>
-              <div className="flex-shrink-0 mt-0.5"><Badge s={r.status}/></div>
             </div>
-            <div className="flex items-center gap-1.5 px-3 pb-2 overflow-hidden">
-              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-lg truncate max-w-[110px] flex-shrink-0">{r.category}</span>
-              <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-lg font-medium flex-shrink-0">{r.qty}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-lg font-medium flex-shrink-0 ${URGENCY_COLOR[r.urgency]||""}`}>{r.urgency}</span>
-              <span className="text-xs text-gray-400 ml-auto whitespace-nowrap flex-shrink-0">{fmtReqDate(r.date)}</span>
-            </div>
-            <div className="flex gap-2 px-3 pb-3 border-t border-gray-50 pt-2" onClick={e=>e.stopPropagation()}>
+
+            {/* Кнопки */}
+            <div style={{ display:'flex', gap:6, padding:'0 14px 12px' }} onClick={e=>e.stopPropagation()}>
               <button onClick={() => repeatOrder(r)}
-                className="flex items-center gap-1 py-1.5 px-3 rounded-xl text-xs font-semibold border transition-colors hover:opacity-80"
-                style={{ color: BRAND, borderColor: `${BRAND}33`, background: `${BRAND}0d` }}>
-                <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6"/><path d="M3.5 15A9 9 0 1 0 5 5.1L1 10"/></svg>
+                style={{ display:'flex', alignItems:'center', gap:4, padding:'6px 12px',
+                  borderRadius:10, fontSize:11, fontWeight:600, border:`1px solid ${BRAND}28`,
+                  background:`${BRAND}0a`, color:BRAND, cursor:'pointer' }}>
+                <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6"/><path d="M3.5 15A9 9 0 1 0 5 5.1L1 10"/></svg>
                 Повторить
               </button>
               {isAdmin && r.status==="Ожидает" && <>
-                <button onClick={()=>approve(r)} className="flex-1 py-1.5 text-white rounded-xl text-xs font-semibold" style={{background:BRAND}}>✓ Одобрить</button>
-                <button onClick={()=>openRejectModal(r)} className="flex-1 py-1.5 bg-gray-100 text-gray-700 rounded-xl text-xs font-medium">✕ Откл.</button>
+                <button onClick={()=>approve(r)}
+                  style={{ flex:1, padding:'6px 0', borderRadius:10, fontSize:11, fontWeight:700,
+                    background:BRAND, color:'white', border:'none', cursor:'pointer' }}>
+                  ✓ Одобрить
+                </button>
+                <button onClick={()=>openRejectModal(r)}
+                  style={{ flex:1, padding:'6px 0', borderRadius:10, fontSize:11, fontWeight:600,
+                    background:'#f8fafc', color:'#64748b', border:'1px solid #e2e8f0', cursor:'pointer' }}>
+                  ✕ Откл.
+                </button>
               </>}
             </div>
           </motion.div>
-        );
+          );
+        };
         return (
           <div className="lg:hidden space-y-2 max-w-full overflow-hidden">
             {activeReqs.map(r => renderCard(r))}
