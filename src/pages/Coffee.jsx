@@ -297,7 +297,7 @@ export default function Coffee({ user }) {
                 initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
                 style={{background:'rgba(0,0,0,0.5)'}} onClick={() => setShipModal(null)}>
                 <motion.div initial={{y:40,opacity:0}} animate={{y:0,opacity:1}} exit={{y:40,opacity:0}}
-                  transition={{type:'spring',stiffness:380,damping:38}}
+                  transition={{duration:0.18,ease:"easeOut"}}
                   className="bg-white rounded-2xl shadow-2xl w-full max-w-sm"
                   onClick={e=>e.stopPropagation()}>
                   <div style={{ padding:'18px 20px 14px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
@@ -359,7 +359,7 @@ export default function Coffee({ user }) {
           className="fixed bottom-24 lg:bottom-8 inset-x-0 lg:inset-x-auto lg:left-52 lg:right-0 mx-auto w-fit z-40 flex items-center gap-2 px-5 py-3 text-white text-sm font-semibold rounded-full whitespace-nowrap"
           style={{ background:'rgba(40,121,141,0.82)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)',
             border:'1px solid rgba(255,255,255,0.25)', boxShadow:'0 8px 32px rgba(40,121,141,0.35)' }}
-          whileHover={{scale:1.05}} whileTap={{scale:0.95}}>
+          whileTap={{scale:0.95}}>
           <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><path d="M10 4v12M4 10h12"/></svg>
           Новый заказ
         </motion.button>
@@ -393,11 +393,10 @@ export default function Coffee({ user }) {
             return (
               <motion.div key={o.id}
                 initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-6}}
-                transition={{delay:i*0.04,duration:0.2}}
+                transition={{duration:0.15}}
                 onClick={() => setSel(o)}
                 style={{ background:'white', borderRadius:16, padding:'16px 18px', border:'1px solid #e8f4f6',
-                  boxShadow:'0 1px 8px rgba(40,121,141,0.06)', cursor:'pointer' }}
-                whileHover={{ boxShadow:'0 4px 20px rgba(40,121,141,0.14)' }}>
+                  boxShadow:'0 1px 8px rgba(40,121,141,0.06)', cursor:'pointer' }}>
 
                 <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:8 }}>
                   <div>
@@ -472,7 +471,7 @@ export default function Coffee({ user }) {
             initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
             style={{background:'rgba(0,0,0,0.5)'}} onClick={() => { setShowForm(false); resetForm(); }}>
             <motion.div initial={{y:40,opacity:0}} animate={{y:0,opacity:1}} exit={{y:40,opacity:0}}
-              transition={{type:'spring',stiffness:380,damping:38}}
+              transition={{duration:0.18,ease:"easeOut"}}
               className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-y-auto"
               onClick={e => e.stopPropagation()}>
 

@@ -501,7 +501,7 @@ export default function Payments({ user }) {
         className="fixed bottom-24 lg:bottom-8 inset-x-0 lg:inset-x-auto lg:left-52 lg:right-0 mx-auto w-fit z-40 flex items-center gap-2 px-5 py-3 text-white text-sm font-semibold rounded-full whitespace-nowrap"
         style={{background:'rgba(40,121,141,0.82)',backdropFilter:'blur(14px)',WebkitBackdropFilter:'blur(14px)',
           border:'1px solid rgba(255,255,255,0.25)',boxShadow:'0 8px 32px rgba(40,121,141,0.35)'}}
-        whileHover={{scale:1.05}} whileTap={{scale:0.95}}>
+        whileTap={{scale:0.95}}>
         <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
           <path d="M10 4v12M4 10h12"/>
         </svg>
@@ -552,11 +552,10 @@ export default function Payments({ user }) {
           {filtered.map((req, i) => (
             <motion.div key={req.id}
               initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-6}}
-              transition={{delay:i*0.04,duration:0.2}}
+              transition={{duration:0.15}}
               onClick={() => setSelected(req)}
               style={{background:'white',borderRadius:16,padding:'16px 18px',border:'1px solid #e8f4f6',
-                boxShadow:'0 1px 8px rgba(40,121,141,0.06)',cursor:'pointer'}}
-              whileHover={{boxShadow:'0 4px 20px rgba(40,121,141,0.14)'}}>
+                boxShadow:'0 1px 8px rgba(40,121,141,0.06)',cursor:'pointer'}}>
 
               <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}}>
                 <div style={{flex:1,minWidth:0}}>
@@ -635,9 +634,9 @@ export default function Payments({ user }) {
             initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
             style={{background:'rgba(0,0,0,0.45)',backdropFilter:'blur(4px)'}}>
             <motion.div initial={{scale:0.85,opacity:0}} animate={{scale:1,opacity:1}} exit={{scale:0.85,opacity:0}}
-              transition={{type:'spring',stiffness:380,damping:28}}
+              transition={{duration:0.18,ease:"easeOut"}}
               style={{background:'white',borderRadius:24,padding:'44px 40px',textAlign:'center',minWidth:260}}>
-              <motion.div initial={{scale:0}} animate={{scale:1}} transition={{type:'spring',stiffness:320,damping:20}}
+              <motion.div initial={{scale:0}} animate={{scale:1}} transition={{duration:0.15,ease:"easeOut"}}
                 style={{fontSize:52,marginBottom:14}}>✅</motion.div>
               <div style={{fontSize:18,fontWeight:800,color:DARK,marginBottom:6}}>Заявка отправлена!</div>
               <div style={{fontSize:13,color:'#6b7280'}}>Ожидайте подтверждения</div>

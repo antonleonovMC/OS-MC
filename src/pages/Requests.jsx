@@ -375,7 +375,7 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
             initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
             style={{background:'rgba(0,0,0,0.5)'}} onClick={() => setDeleteConfirm(false)}>
             <motion.div initial={{y:40,opacity:0}} animate={{y:0,opacity:1}} exit={{y:40,opacity:0}}
-              transition={{type:'spring',stiffness:380,damping:38}}
+              transition={{duration:0.18,ease:"easeOut"}}
               className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
               onClick={e => e.stopPropagation()}>
               <div className="p-5">
@@ -416,7 +416,7 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
             style={{ background:'rgba(0,0,0,0.45)', backdropFilter:'blur(4px)' }}>
             <motion.div
               initial={{ scale:0.8, opacity:0 }} animate={{ scale:1, opacity:1 }} exit={{ scale:0.8, opacity:0 }}
-              transition={{ type:'spring', stiffness:380, damping:28 }}
+              transition={{duration:0.18,ease:"easeOut"}}
               style={{ background:'white', borderRadius:24, padding:'44px 40px', textAlign:'center',
                 position:'relative', overflow:'hidden', minWidth:260 }}>
               <SuccessConfetti />
@@ -451,7 +451,7 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
               onClick={() => setShowForm(true)}
               className="relative flex items-center gap-2 px-5 py-3 text-white text-sm font-semibold rounded-full whitespace-nowrap"
               style={{ background:'rgba(40,121,141,0.88)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', border:'1px solid rgba(255,255,255,0.25)', boxShadow:'0 8px 32px rgba(40,121,141,0.4)' }}
-              whileHover={{ scale:1.06 }} whileTap={{ scale:0.94 }}>
+              whileTap={{scale:0.95}}>
               <motion.svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"
                 animate={{ rotate:[0, 90, 0] }} transition={{ duration:3, repeat:Infinity, ease:'easeInOut', repeatDelay:2 }}>
                 <path d="M10 4v12M4 10h12"/>
@@ -820,7 +820,7 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
                 </button>
                 <AnimatePresence>
                   {rejectedOpen && (
-                    <motion.div initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }}
+                    <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
                       transition={{ duration:0.22, ease:'easeInOut' }} className="overflow-hidden">
                       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto mt-2">
                         <table className="w-full text-sm">
@@ -910,7 +910,7 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
                 <AnimatePresence>
                   {rejectedOpen && (
                     <motion.div
-                      initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }}
+                      initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
                       transition={{ duration:0.22, ease:'easeInOut' }}
                       className="overflow-hidden">
                       <div className="space-y-2 pt-2">
@@ -933,7 +933,7 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
             initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
             style={{background:'rgba(0,0,0,0.5)'}} onClick={() => setRejectModal(null)}>
             <motion.div initial={{y:40,opacity:0}} animate={{y:0,opacity:1}} exit={{y:40,opacity:0}}
-              transition={{type:'spring',stiffness:380,damping:38}}
+              transition={{duration:0.18,ease:"easeOut"}}
               className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
               onClick={e => e.stopPropagation()}>
               <div className="p-5 border-b border-gray-100">

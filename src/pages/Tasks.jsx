@@ -56,7 +56,7 @@ function TaskCard({ task, compact, setModal }) {
   const subTotal = task.subtasks.length;
   const pct      = subTotal ? Math.round(subDone / subTotal * 100) : null;
   return (
-    <motion.div whileHover={{ boxShadow:'0 4px 20px rgba(40,121,141,0.14)' }}
+    <motion.div
       onClick={() => setModal(task)}
       style={{ background:'white', borderRadius:14, padding: compact ? '12px 14px' : '14px 16px',
         border:`1px solid #e8f4f6`, borderLeftWidth:3, borderLeftColor:ps.dot,
@@ -95,7 +95,7 @@ function FAB({ defaultCol, setCreateCol, setForm }) {
       className="fixed bottom-24 lg:bottom-8 inset-x-0 lg:inset-x-auto lg:left-52 lg:right-0 mx-auto w-fit z-40 flex items-center gap-2 px-5 py-3 text-white text-sm font-semibold rounded-full whitespace-nowrap"
       style={{ background:'rgba(40,121,141,0.82)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)',
         border:'1px solid rgba(255,255,255,0.25)', boxShadow:'0 8px 32px rgba(40,121,141,0.35)' }}
-      whileHover={{ scale:1.05 }} whileTap={{ scale:0.95 }}>
+      whileTap={{ scale:0.95 }}>
       <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><path d="M10 4v12M4 10h12"/></svg>
       Добавить задачу
     </motion.button>
@@ -171,7 +171,7 @@ function CreateModal({ createCol, setCreateCol, form, setForm, createTask }) {
           initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
           style={{background:'rgba(0,0,0,0.5)'}} onClick={() => setCreateCol(null)}>
           <motion.div initial={{y:40,opacity:0}} animate={{y:0,opacity:1}} exit={{y:40,opacity:0}}
-            transition={{type:'spring',stiffness:380,damping:38}}
+            transition={{duration:0.18,ease:"easeOut"}}
             className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}>
             <div style={{ padding:'18px 20px 14px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
@@ -266,7 +266,7 @@ function TaskModal({ modal, setModal, comment, setComment, tag, setTag, fileRef,
         initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
         style={{background:'rgba(0,0,0,0.5)'}} onClick={() => setModal(null)}>
         <motion.div initial={{y:40,opacity:0}} animate={{y:0,opacity:1}} exit={{y:40,opacity:0}}
-          transition={{type:'spring',stiffness:380,damping:38}}
+          transition={{duration:0.18,ease:"easeOut"}}
           className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
           onClick={e => e.stopPropagation()}>
 

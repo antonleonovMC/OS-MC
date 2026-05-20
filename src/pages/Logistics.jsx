@@ -654,7 +654,7 @@ export default function Logistics({ user }) {
           </button>
           <AnimatePresence initial={false}>
             {subOpen && (
-              <motion.div initial={{ height:0, opacity:0 }} animate={{ height:'auto', opacity:1 }} exit={{ height:0, opacity:0 }}
+              <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
                 transition={{ duration:0.22, ease:'easeInOut' }} style={{ overflow:'hidden' }}>
                 <div className="divide-y divide-gray-50">
                   {orders.filter(o => isSubscribed(o.id)).map(o => (
@@ -795,9 +795,7 @@ export default function Logistics({ user }) {
                 <AnimatePresence initial={false}>
                   {deliveredOpen && (
                     <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
+                      initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
                       transition={{ duration: 0.22, ease: 'easeInOut' }}
                       style={{ overflow: 'hidden' }}>
                       <div className="p-3 space-y-2 border-t border-emerald-50">
