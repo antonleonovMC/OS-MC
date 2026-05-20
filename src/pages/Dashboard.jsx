@@ -74,20 +74,24 @@ function toISO(d) {
 function useCurrencyRates() {
   const [rates,   setRates]   = useState(null);
   const [updated, setUpdated] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const HOUR  = 60 * 60 * 1000;
-    const today = new Date().toISOString().slice(0, 10);
-
+  const load = (force = false) => {
+    const HOUR      = 60 * 60 * 1000;
+    const today     = new Date().toISOString().slice(0, 10);
     const CACHE_KEY = `mc_rates_v2_${today}`;
-    const stored = localStorage.getItem(CACHE_KEY);
-    const snap   = stored ? JSON.parse(stored) : null;
-    if (snap) {
-      setRates(snap.rates);
-      setUpdated(snap.updated);
-      if (Date.now() - snap.ts < HOUR) return;
+
+    if (!force) {
+      const stored = localStorage.getItem(CACHE_KEY);
+      const snap   = stored ? JSON.parse(stored) : null;
+      if (snap) {
+        setRates(snap.rates);
+        setUpdated(snap.updated);
+        if (Date.now() - snap.ts < HOUR) return;
+      }
     }
 
+    setLoading(true);
     fetch('/api/rates')
       .then(r => r.json())
       .then(d => {
@@ -97,14 +101,17 @@ function useCurrencyRates() {
         setUpdated(upd);
         localStorage.setItem(CACHE_KEY, JSON.stringify({ rates: d.rates, updated: upd, ts: Date.now() }));
       })
-      .catch(() => {});
-  }, []);
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
 
-  return { rates, updated };
+  useEffect(() => { load(); }, []);
+
+  return { rates, updated, loading, refresh: () => load(true) };
 }
 
 function CurrencyWidget() {
-  const { rates, updated } = useCurrencyRates();
+  const { rates, updated, loading, refresh } = useCurrencyRates();
 
   const items = [
     { code:'USD', label:'Доллар', sign:'$' },
@@ -126,9 +133,17 @@ function CurrencyWidget() {
           <span style={{ fontSize:13, fontWeight:600, color:'#1a3a42' }}>Курс валют</span>
           <span style={{ fontSize:10, color:'#94a3b8', marginLeft:8 }}>официальный курс НБ РК · ₸</span>
         </div>
-        <span style={{ fontSize:10, color:'#b0c4cc' }}>
-          {updated ? `обновлено ${updated}` : rates === null ? '…' : 'ошибка загрузки'}
-        </span>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <span style={{ fontSize:10, color:'#b0c4cc' }}>
+            {updated ? `обновлено ${updated}` : rates === null ? '…' : 'ошибка загрузки'}
+          </span>
+          <button onClick={refresh} disabled={loading}
+            style={{ fontSize:10, padding:'3px 10px', borderRadius:20, border:'1px solid #d0eaee',
+              background: loading ? '#f4f8f9' : 'white', color: loading ? '#b0c4cc' : '#28798d',
+              cursor: loading ? 'default' : 'pointer', transition:'all .15s' }}>
+            {loading ? '...' : '↻ обновить'}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4" style={{ gap:8 }}>
