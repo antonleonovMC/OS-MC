@@ -850,23 +850,28 @@ export default function Requests({ user, sidebarOpen, onCreateLogisticsOrder }) 
           <motion.div key={r.id}
             initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:0.18}}
             onClick={() => setSelId(r.id)}
-            className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden w-full"
+            className="bg-white rounded-2xl border border-gray-100 shadow-sm cursor-pointer active:scale-[0.98] transition-transform w-full"
             style={{ borderLeft: `4px solid ${URGENCY_BORDER[r.urgency] || '#e5e7eb'}`, boxSizing:'border-box' }}>
-            <div className="flex items-start justify-between mb-2 gap-2 w-full min-w-0">
+            <div className="flex items-start justify-between gap-2 p-3 pb-2">
               <div className="min-w-0 flex-1 overflow-hidden">
-                <span className="text-xs font-mono text-gray-400">{r.id}</span>
-                <div className="font-semibold text-gray-800 text-sm mt-0.5 break-words">{r.product}</div>
-                <div className="text-xs text-gray-500 mt-0.5 truncate">{r.employee} · {r.dept}</div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-xs font-mono text-gray-400 flex-shrink-0">{r.id}</span>
+                  <span className="text-xs text-gray-400 truncate">{r.employee} · {r.dept}</span>
+                </div>
+                <div className="font-semibold text-gray-800 text-sm leading-tight"
+                  style={{ display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
+                  {r.product}
+                </div>
               </div>
-              <div className="flex-shrink-0"><Badge s={r.status}/></div>
+              <div className="flex-shrink-0 mt-0.5"><Badge s={r.status}/></div>
             </div>
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-lg max-w-[100px] truncate">{r.category}</span>
-              <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-lg font-medium">{r.qty}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-lg font-medium ${URGENCY_COLOR[r.urgency]||""}`}>{r.urgency}</span>
-              <span className="text-xs text-gray-400 ml-auto whitespace-nowrap">{fmtReqDate(r.date)}</span>
+            <div className="flex items-center gap-1.5 px-3 pb-2 overflow-hidden">
+              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-lg truncate max-w-[110px] flex-shrink-0">{r.category}</span>
+              <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-lg font-medium flex-shrink-0">{r.qty}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-lg font-medium flex-shrink-0 ${URGENCY_COLOR[r.urgency]||""}`}>{r.urgency}</span>
+              <span className="text-xs text-gray-400 ml-auto whitespace-nowrap flex-shrink-0">{fmtReqDate(r.date)}</span>
             </div>
-            <div className="flex gap-2 pt-2 border-t border-gray-50" onClick={e=>e.stopPropagation()}>
+            <div className="flex gap-2 px-3 pb-3 border-t border-gray-50 pt-2" onClick={e=>e.stopPropagation()}>
               <button onClick={() => repeatOrder(r)}
                 className="flex items-center gap-1 py-1.5 px-3 rounded-xl text-xs font-semibold border transition-colors hover:opacity-80"
                 style={{ color: BRAND, borderColor: `${BRAND}33`, background: `${BRAND}0d` }}>
