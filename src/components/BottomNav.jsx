@@ -11,7 +11,7 @@ const NAV_ITEMS = [
   { id: 'requests',  label: 'Закуп',     icon: 'line-md:clipboard-list'  },
   { id: 'coffee',    label: 'Кофе',      icon: 'line-md:coffee'          },
   { id: 'tasks',     label: 'Задачи',    icon: 'line-md:check-list-3'    },
-  { id: 'payments',  label: 'Оплата',    icon: 'line-md:briefcase'       },
+  { id: 'payments',  label: 'Оплата',    icon: 'solar:wallet-2-bold', static: true },
 ];
 
 // Отключаем CSS-анимации для неактивных иконок
@@ -86,10 +86,17 @@ export default function BottomNav({ user, page, setPage }) {
                   paddingTop: 9, paddingBottom: 9,
                   minWidth: 44,
                 }}>
-                  {/* Иконка: key меняется при активации — запускает анимацию */}
+                  {/* Иконка */}
                   <motion.div
-                    animate={{ scale: active ? 1.08 : 1, opacity: active ? 1 : 0.52 }}
-                    transition={SPRING}
+                    animate={
+                      item.static
+                        ? { scale: active ? [1, 1.3, 0.9, 1.08] : 1, opacity: active ? 1 : 0.52 }
+                        : { scale: active ? 1.08 : 1, opacity: active ? 1 : 0.52 }
+                    }
+                    transition={item.static && active
+                      ? { duration: 0.35, times: [0, 0.4, 0.7, 1], ease: 'easeOut' }
+                      : SPRING
+                    }
                     style={{ willChange: 'transform, opacity' }}
                   >
                     <div
